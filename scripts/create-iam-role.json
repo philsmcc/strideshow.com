@@ -1,0 +1,54 @@
+{
+  "Instructions": "Create an IAM Role for your EC2 instance to access S3",
+  
+  "Step1_CreateRole": {
+    "description": "Create IAM Role with EC2 trust policy",
+    "roleName": "StrideShowEC2Role",
+    "trustPolicy": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+  },
+
+  "Step2_AttachPolicy": {
+    "description": "Create and attach S3 access policy",
+    "policyName": "StrideShowS3Policy",
+    "policyDocument": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "AllowS3BucketAccess",
+          "Effect": "Allow",
+          "Action": [
+            "s3:PutObject",
+            "s3:GetObject",
+            "s3:DeleteObject",
+            "s3:ListBucket"
+          ],
+          "Resource": [
+            "arn:aws:s3:::strideshow-content",
+            "arn:aws:s3:::strideshow-content/*"
+          ]
+        }
+      ]
+    }
+  },
+
+  "Step3_CreateInstanceProfile": {
+    "description": "Create instance profile and add role",
+    "instanceProfileName": "StrideShowEC2Profile"
+  },
+
+  "Step4_AttachToEC2": {
+    "description": "Attach the instance profile to your EC2 instance",
+    "note": "Go to EC2 Console > Select Instance > Actions > Security > Modify IAM Role"
+  }
+}
