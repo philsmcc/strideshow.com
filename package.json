@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@aws-sdk/client-ec2": "^3.969.0",
     "@aws-sdk/client-iam": "^3.969.0",
     "@aws-sdk/client-s3": "^3.969.0",
     "@aws-sdk/client-sts": "^3.969.0",
