@@ -6,24 +6,11 @@ const QRCode = require('qrcode');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const s3Storage = require('./s3-storage');
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const uploadDir = path.join(__dirname, '../public/uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
+// Configure multer for memory storage (for S3 uploads)
 const upload = multer({
-    storage: storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
     fileFilter: function (req, file, cb) {
         const allowedTypes = /jpeg|jpg|png|gif|webp/;
@@ -111,12 +98,18 @@ router.delete('/slideshows/:id', ensureAuthenticated, async (req, res) => {
             [req.params.id, req.user.id]
         );
         
-        // Delete slide files
+        // Delete slide files from S3 or local storage
         for (const slide of slidesResult.rows) {
-            if (slide.content_url && slide.content_url.startsWith('/uploads/')) {
-                const filePath = path.join(__dirname, '../public', slide.content_url);
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
+            if (slide.content_url) {
+                if (s3Storage.isS3Url(slide.content_url)) {
+                    // Delete from S3
+                    await s3Storage.deleteFile(slide.content_url);
+                } else if (slide.content_url.startsWith('/uploads/')) {
+                    // Legacy: Delete from local storage
+                    const filePath = path.join(__dirname, '../public', slide.content_url);
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                    }
                 }
             }
         }
@@ -178,7 +171,10 @@ router.post('/slideshows/:id/slides', ensureAuthenticated, upload.single('image'
         // Get the image URL - either from uploaded file or from body
         let imageUrl = null;
         if (req.file) {
-            imageUrl = '/uploads/' + req.file.filename;
+            // Upload to S3
+            const s3Key = s3Storage.generateS3Key(req.user.id, req.file.originalname, 'slides');
+            const contentType = s3Storage.getContentType(req.file.originalname);
+            imageUrl = await s3Storage.uploadFile(req.file.buffer, s3Key, contentType);
         } else if (req.body.image_url) {
             imageUrl = req.body.image_url;
         }
@@ -294,11 +290,17 @@ router.delete('/slides/:id', ensureAuthenticated, async (req, res) => {
         
         const slide = slideResult.rows[0];
         
-        // Delete the file if it's a local upload
-        if (slide.content_url && slide.content_url.startsWith('/uploads/')) {
-            const filePath = path.join(__dirname, '../public', slide.content_url);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+        // Delete the file from S3 or local storage
+        if (slide.content_url) {
+            if (s3Storage.isS3Url(slide.content_url)) {
+                // Delete from S3
+                await s3Storage.deleteFile(slide.content_url);
+            } else if (slide.content_url.startsWith('/uploads/')) {
+                // Legacy: Delete from local storage
+                const filePath = path.join(__dirname, '../public', slide.content_url);
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
             }
         }
         

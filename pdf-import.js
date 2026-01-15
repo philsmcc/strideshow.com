@@ -3,16 +3,20 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs").promises;
+const fsSync = require("fs");
 const { exec } = require("child_process");
 const { promisify } = require("util");
 const pool = require("../config/database");
+const s3Storage = require("./s3-storage");
+const os = require("os");
 
 const execAsync = promisify(exec);
 
-// Configure multer for PDF uploads
+// Configure multer for PDF uploads - use temp directory
 const storage = multer.diskStorage({
     destination: async (req, file, cb) => {
-        const uploadDir = path.join(__dirname, "../public/uploads/pdf");
+        // Use system temp directory instead of public folder
+        const uploadDir = path.join(os.tmpdir(), "strideshow-pdf-uploads");
         try {
             await fs.mkdir(uploadDir, { recursive: true });
             cb(null, uploadDir);
@@ -57,8 +61,8 @@ router.post("/upload", ensureAuthenticated, upload.single("pdf"), async (req, re
     const pdfPath = req.file.path;
     const title = req.body.title || path.basename(req.file.originalname, ".pdf");
     
-    // Create output directory for this PDF's images
-    const outputDir = path.join(__dirname, "../public/uploads/slides", Date.now().toString());
+    // Create temp output directory for this PDF's images
+    const outputDir = path.join(os.tmpdir(), "strideshow-slides", Date.now().toString());
     
     try {
         await fs.mkdir(outputDir, { recursive: true });
@@ -101,11 +105,15 @@ router.post("/upload", ensureAuthenticated, upload.single("pdf"), async (req, re
         );
         const slideshow = slideshowResult.rows[0];
         
-        // Insert each slide into database
+        // Upload each slide to S3 and insert into database
         const importedSlides = [];
         for (let i = 0; i < slideImages.length; i++) {
             const imageName = slideImages[i];
-            const imageUrl = `/uploads/slides/${path.basename(outputDir)}/${imageName}`;
+            const localImagePath = path.join(outputDir, imageName);
+            
+            // Upload to S3
+            const s3Key = s3Storage.generateS3Key(req.user.id, imageName, 'slides');
+            const imageUrl = await s3Storage.uploadFileFromPath(localImagePath, s3Key, 'image/png');
             
             const slideResult = await pool.query(
                 `INSERT INTO slides (slideshow_id, slide_order, content_url, thumbnail_url)
@@ -115,8 +123,9 @@ router.post("/upload", ensureAuthenticated, upload.single("pdf"), async (req, re
             importedSlides.push(slideResult.rows[0]);
         }
         
-        // Clean up the original PDF to save space
+        // Clean up temp files
         await fs.unlink(pdfPath).catch(() => {});
+        await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {});
         
         res.json({
             success: true,
