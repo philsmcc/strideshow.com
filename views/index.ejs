@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- include('partials/head') %>
+    <title>StrideShow - Present from Any Device</title>
+    <style>
+        .hero-slideshow {
+            position: relative;
+            min-height: 500px;
+            overflow: hidden;
+        }
+        .hero-slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+        .hero-slide.active {
+            opacity: 1;
+            position: relative;
+        }
+        .hero-slide-1 {
+            background: linear-gradient(to bottom right, #f3f4f6, #e5e7eb);
+        }
+        .hero-slide-2 {
+            background: url('/hero-slide-2.png') center center / cover no-repeat;
+        }
+        .slide-indicators {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 20;
+        }
+        .slide-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid rgba(255,255,255,0.8);
+        }
+        .slide-indicator.active {
+            background: white;
+            transform: scale(1.2);
+        }
+        .slide-indicator:hover {
+            background: rgba(255,255,255,0.8);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <%- include('partials/navbar-tw') %>
+    
+    <!-- Hero Slideshow -->
+    <section class="hero-slideshow">
+        <!-- Slide 1: Original -->
+        <div class="hero-slide hero-slide-1 active" data-slide="0">
+            <div class="py-20 px-4">
+                <div class="max-w-4xl mx-auto text-center">
+                    <img src="/strideshow-logo.png" alt="StrideShow" class="h-16 md:h-20 mx-auto mb-8">
+                    <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-6">Present from Any Device</h1>
+                    <p class="text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
+                        Control your presentations from your phone while displaying on any screen. 
+                        No cables, no apps to install - just scan a code and present.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <a href="/register" class="bg-gradient-to-r from-primary-500 to-primary-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:shadow-xl hover:shadow-primary-500/30 transition-all hover:-translate-y-1">
+                            Get Started Free
+                        </a>
+                        <a href="/go" class="bg-white text-gray-700 px-8 py-4 rounded-full font-semibold text-lg border-2 border-gray-300 hover:border-primary-500 hover:text-primary-600 transition-all hover:-translate-y-1">
+                            Open Display Screen
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Slide 2: New Hero Image with CTA in upper left -->
+        <div class="hero-slide hero-slide-2" data-slide="1">
+            <div class="py-12 px-4 md:px-12 min-h-[500px] flex items-start">
+                <div class="max-w-xl text-left pt-4 md:pt-6 pl-4 md:pl-8">
+                    <h1 class="text-3xl md:text-4xl font-bold text-white mb-4 drop-shadow-lg">
+                        Your Phone is Your Remote
+                    </h1>
+                    <p class="text-lg text-white/90 mb-8 leading-relaxed drop-shadow-md max-w-md">
+                        Present like a pro. Control slides, view notes, and engage your audience - all from your smartphone.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <a href="/register" class="bg-white text-primary-600 px-6 py-3 rounded-full font-semibold hover:shadow-xl transition-all hover:-translate-y-1 text-center">
+                            Start Presenting Free
+                        </a>
+                        <a href="/go" class="bg-white/20 backdrop-blur text-white px-6 py-3 rounded-full font-semibold border-2 border-white/50 hover:bg-white/30 transition-all hover:-translate-y-1 text-center">
+                            Open Display
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Slide Indicators -->
+        <div class="slide-indicators">
+            <div class="slide-indicator active" data-slide="0"></div>
+            <div class="slide-indicator" data-slide="1"></div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-20 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-16">Why StrideShow?</h2>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-2xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
+                    <div class="text-5xl mb-6">📱</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Control from Your Phone</h3>
+                    <p class="text-gray-600 leading-relaxed">Use your smartphone as a remote control. Navigate slides, view speaker notes, and manage your presentation with ease.</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
+                    <div class="text-5xl mb-6">🖥️</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Display Anywhere</h3>
+                    <p class="text-gray-600 leading-relaxed">Open the display on any device with a browser - TVs, projectors, laptops. No special software required.</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
+                    <div class="text-5xl mb-6">🔗</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Instant Connection</h3>
+                    <p class="text-gray-600 leading-relaxed">Just scan a QR code or enter a 6-digit code. Connect to any display in seconds without complex setup.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="bg-white py-20 px-4">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-16">How It Works</h2>
+            <div class="grid md:grid-cols-3 gap-12">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6 shadow-lg shadow-primary-500/30">1</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Open Display</h3>
+                    <p class="text-gray-600">Go to <span class="text-primary-600 font-medium">/go</span> on your TV or projector browser to show the connection code.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6 shadow-lg shadow-primary-500/30">2</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Connect</h3>
+                    <p class="text-gray-600">Scan the QR code or enter the code on your phone to connect as presenter.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6 shadow-lg shadow-primary-500/30">3</div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Present</h3>
+                    <p class="text-gray-600">Select your slideshow and control the presentation from your device!</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section - Light gray with primary accents -->
+    <section class="bg-gray-100 py-16 px-4 border-t border-gray-200">
+        <div class="max-w-3xl mx-auto text-center">
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-6">Ready to Transform Your Presentations?</h2>
+            <p class="text-xl text-gray-600 mb-10">Join thousands of presenters who've simplified their workflow with StrideShow.</p>
+            <a href="/register" class="inline-block bg-gradient-to-r from-primary-500 to-primary-600 text-white px-10 py-4 rounded-full font-semibold text-lg hover:shadow-xl hover:shadow-primary-500/30 transition-all hover:-translate-y-1">
+                Create Free Account
+            </a>
+        </div>
+    </section>
+
+    <%- include('partials/footer-tw') %>
+
+    <script>
+        // Hero Slideshow
+        const slides = document.querySelectorAll('.hero-slide');
+        const indicators = document.querySelectorAll('.slide-indicator');
+        let currentSlide = 0;
+        let slideInterval;
+
+        function showSlide(index) {
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === index);
+            });
+            indicators.forEach((indicator, i) => {
+                indicator.classList.toggle('active', i === index);
+            });
+            currentSlide = index;
+        }
+
+        function nextSlide() {
+            const next = (currentSlide + 1) % slides.length;
+            showSlide(next);
+        }
+
+        function startSlideshow() {
+            slideInterval = setInterval(nextSlide, 6000); // Change every 6 seconds
+        }
+
+        function resetInterval() {
+            clearInterval(slideInterval);
+            startSlideshow();
+        }
+
+        // Click indicators to change slides
+        indicators.forEach((indicator, index) => {
+            indicator.addEventListener('click', () => {
+                showSlide(index);
+                resetInterval();
+            });
+        });
+
+        // Start the slideshow
+        startSlideshow();
+
+        // Pause on hover (optional)
+        const heroSection = document.querySelector('.hero-slideshow');
+        heroSection.addEventListener('mouseenter', () => clearInterval(slideInterval));
+        heroSection.addEventListener('mouseleave', startSlideshow);
+    </script>
+</body>
+</html>

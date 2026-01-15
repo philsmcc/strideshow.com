@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect to Screen - StrideShow</title>
+    <link rel="icon" type="image/png" href="/strideshow-icon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+        .connect-container {
+            max-width: 500px;
+            margin: 80px auto;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .connect-logo {
+            max-width: 200px;
+            margin-bottom: 30px;
+        }
+        .connect-title {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .connect-subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+        .code-input-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .code-input {
+            width: 55px;
+            height: 65px;
+            font-size: 2rem;
+            text-align: center;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            text-transform: uppercase;
+            font-family: "Courier New", monospace;
+            font-weight: bold;
+        }
+        .code-input:focus {
+            border-color: #00d4aa;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.2);
+        }
+        .connect-btn {
+            background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
+            color: white;
+            border: none;
+            padding: 16px 60px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .connect-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 170, 0.4);
+        }
+        .connect-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .error-message {
+            color: #f44336;
+            margin-top: 20px;
+            display: none;
+        }
+        .scan-option {
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+        }
+        .scan-option p {
+            color: #666;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    
+    <div class="connect-container">
+        <img src="/strideshow-logo.png" alt="StrideShow" class="connect-logo">
+        <h1 class="connect-title">Connect to Display</h1>
+        <p class="connect-subtitle">Enter the 6-digit code shown on the display screen</p>
+        
+        <form id="connectForm">
+            <div class="code-input-container">
+                <input type="text" class="code-input" maxlength="1" data-index="0" autofocus>
+                <input type="text" class="code-input" maxlength="1" data-index="1">
+                <input type="text" class="code-input" maxlength="1" data-index="2">
+                <input type="text" class="code-input" maxlength="1" data-index="3">
+                <input type="text" class="code-input" maxlength="1" data-index="4">
+                <input type="text" class="code-input" maxlength="1" data-index="5">
+            </div>
+            
+            <button type="submit" class="connect-btn" id="connectBtn" disabled>Connect</button>
+            
+            <p class="error-message" id="errorMessage"></p>
+        </form>
+        
+        <div class="scan-option">
+            <p>Or scan the QR code on the display screen with your camera</p>
+        </div>
+    </div>
+
+    <script>
+        const inputs = document.querySelectorAll('.code-input');
+        const connectBtn = document.getElementById('connectBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const connectForm = document.getElementById('connectForm');
+
+        inputs.forEach((input, index) => {
+            input.addEventListener('input', (e) => {
+                const value = e.target.value.toUpperCase();
+                e.target.value = value;
+                if (value && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+                checkCode();
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                    inputs[index - 1].focus();
+                }
+            });
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pastedData = e.clipboardData.getData('text').toUpperCase().slice(0, 6);
+                pastedData.split('').forEach((char, i) => {
+                    if (inputs[i]) inputs[i].value = char;
+                });
+                checkCode();
+                if (pastedData.length === 6) inputs[5].focus();
+            });
+        });
+
+        function checkCode() {
+            const code = Array.from(inputs).map(i => i.value).join('');
+            connectBtn.disabled = code.length !== 6;
+        }
+
+        connectForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const code = Array.from(inputs).map(i => i.value).join('').toUpperCase();
+            
+            connectBtn.disabled = true;
+            connectBtn.textContent = 'Connecting...';
+            errorMessage.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/screens/validate/' + code);
+                const data = await response.json();
+                
+                if (data.valid) {
+                    window.location.href = '/connect/' + code;
+                } else {
+                    errorMessage.textContent = data.error || 'Invalid code. Please try again.';
+                    errorMessage.style.display = 'block';
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = 'Connect';
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Connection error. Please try again.';
+                errorMessage.style.display = 'block';
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect';
+            }
+        });
+    </script>
+</body>
+</html>

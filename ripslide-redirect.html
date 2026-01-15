@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RipSlide is now StrideShow</title>
+    <meta http-equiv="refresh" content="5;url=https://www.strideshow.com">
+    <link rel="icon" type="image/png" href="/strideshow-icon.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            color: #fff;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 40px;
+            max-width: 600px;
+        }
+        
+        .old-logo {
+            font-size: 2rem;
+            color: #888;
+            margin-bottom: 20px;
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+        
+        .arrow {
+            font-size: 3rem;
+            color: #00d4aa;
+            margin: 20px 0;
+            animation: bounce 1s ease infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .new-logo {
+            max-width: 350px;
+            margin: 20px auto;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #00d4aa;
+        }
+        
+        p {
+            font-size: 1.2rem;
+            color: #b0b0b0;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
+            color: #fff;
+            text-decoration: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 212, 170, 0.4);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(0, 212, 170, 0.6);
+        }
+        
+        .redirect-notice {
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .features {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        
+        .feature {
+            text-align: center;
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        
+        .feature-text {
+            font-size: 0.9rem;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="old-logo">RipSlide</div>
+        
+        <div class="arrow">↓</div>
+        
+        <img src="/strideshow-logo.png" alt="StrideShow" class="new-logo">
+        
+        <h1>We've Got a New Name!</h1>
+        
+        <p>
+            RipSlide has evolved into <strong>StrideShow</strong> — the same great 
+            wireless presentation control you love, with a fresh new look and features.
+        </p>
+        
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <div class="feature-text">Phone Control</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📺</div>
+                <div class="feature-text">Any Display</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <div class="feature-text">No Cables</div>
+            </div>
+        </div>
+        
+        <a href="https://www.strideshow.com" class="cta-button">
+            Go to StrideShow →
+        </a>
+        
+        <p class="redirect-notice">
+            You'll be automatically redirected in 5 seconds...
+        </p>
+    </div>
+</body>
+</html>

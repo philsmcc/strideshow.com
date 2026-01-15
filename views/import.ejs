@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- include('partials/head') %>
+    <title>Import Presentation - StrideShow</title>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <%- include('partials/navbar-tw') %>
+    
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+            <div class="flex items-center gap-3">
+                <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                <h1 class="text-2xl font-bold text-gray-800">Import Presentation</h1>
+            </div>
+            <a href="/dashboard" class="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-full font-medium hover:bg-gray-200 transition-colors">
+                Back to Dashboard
+            </a>
+        </div>
+        
+        <!-- Import Form -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+            <!-- Instructions -->
+            <div class="mb-8">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">Import from PDF</h2>
+                <p class="text-gray-600 mb-4">
+                    Export your presentation from <strong>PowerPoint</strong>, <strong>Keynote</strong>, <strong>Google Slides</strong>, 
+                    or any other app as a PDF, then upload it here. Each page becomes a slide.
+                </p>
+                <div class="flex flex-wrap gap-4 text-sm text-gray-500">
+                    <span class="flex items-center gap-1">
+                        <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/></svg>
+                        PowerPoint (.pptx → PDF)
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <svg class="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/></svg>
+                        Keynote (.key → PDF)
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <svg class="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/></svg>
+                        Google Slides (Download as PDF)
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Upload Area -->
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div 
+                    id="dropZone"
+                    class="border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center hover:border-primary-400 hover:bg-primary-50/50 transition-all cursor-pointer"
+                >
+                    <input type="file" id="pdfInput" name="pdf" accept=".pdf,application/pdf" class="hidden">
+                    
+                    <div id="dropContent">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <p class="text-lg font-medium text-gray-700 mb-2">Drop your PDF here</p>
+                        <p class="text-gray-500 mb-4">or click to browse</p>
+                        <span class="inline-block px-4 py-2 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition-colors">
+                            Select PDF
+                        </span>
+                    </div>
+                    
+                    <div id="fileInfo" class="hidden">
+                        <svg class="w-16 h-16 mx-auto text-red-500 mb-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h6v6h6v10H6z"/>
+                        </svg>
+                        <p id="fileName" class="text-lg font-medium text-gray-700 mb-1">filename.pdf</p>
+                        <p id="fileSize" class="text-gray-500 mb-4">0 MB</p>
+                        <button type="button" id="clearFile" class="text-red-500 hover:text-red-700 font-medium">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Title Input -->
+                <div class="mt-6">
+                    <label for="title" class="block text-sm font-medium text-gray-700 mb-2">
+                        Presentation Title (optional)
+                    </label>
+                    <input 
+                        type="text" 
+                        id="title" 
+                        name="title"
+                        placeholder="Leave blank to use filename"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    >
+                </div>
+                
+                <!-- Progress Bar -->
+                <div id="progressContainer" class="mt-6 hidden">
+                    <div class="flex justify-between text-sm text-gray-600 mb-2">
+                        <span id="progressStatus">Uploading...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div id="progressBar" class="bg-gradient-to-r from-primary-500 to-primary-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <!-- Error message -->
+                <div id="errorMessage" class="hidden mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700"></div>
+                
+                <!-- Submit button -->
+                <button 
+                    type="submit" 
+                    id="uploadBtn"
+                    disabled
+                    class="mt-6 w-full px-8 py-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-primary-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+                >
+                    Import Presentation
+                </button>
+            </form>
+        </div>
+        
+        <!-- Tips -->
+        <div class="mt-8 bg-blue-50 border border-blue-100 rounded-2xl p-6">
+            <h3 class="font-semibold text-blue-800 mb-3">💡 Tips for Best Results</h3>
+            <ul class="space-y-2 text-blue-700 text-sm">
+                <li>• <strong>From Google Slides:</strong> File → Download → PDF Document (.pdf)</li>
+                <li>• <strong>From PowerPoint:</strong> File → Export → Create PDF/XPS</li>
+                <li>• <strong>From Keynote:</strong> File → Export To → PDF</li>
+                <li>• Use high quality export settings for best slide clarity</li>
+                <li>• Maximum file size: 100MB</li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Success Modal -->
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden" id="successModal">
+        <div class="bg-white rounded-2xl p-10 max-w-md mx-4 text-center">
+            <div class="text-6xl mb-4">✅</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-3">Import Successful!</h2>
+            <p class="text-gray-500 mb-8" id="successMessage">Your presentation has been imported.</p>
+            <a href="/dashboard" class="inline-block px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold">
+                Go to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const pdfInput = document.getElementById('pdfInput');
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const dropContent = document.getElementById('dropContent');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const clearFile = document.getElementById('clearFile');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressStatus = document.getElementById('progressStatus');
+        const progressPercent = document.getElementById('progressPercent');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        let selectedFile = null;
+        
+        // Click to browse
+        dropZone.addEventListener('click', (e) => {
+            if (e.target !== clearFile && !clearFile.contains(e.target)) {
+                pdfInput.click();
+            }
+        });
+        
+        // Drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-primary-500', 'bg-primary-50');
+        });
+        
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary-500', 'bg-primary-50');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-primary-500', 'bg-primary-50');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/pdf') {
+                handleFileSelect(file);
+            } else {
+                showError('Please select a PDF file');
+            }
+        });
+        
+        // File input change
+        pdfInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+        
+        // Clear file
+        clearFile.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearSelectedFile();
+        });
+        
+        function handleFileSelect(file) {
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            
+            dropContent.classList.add('hidden');
+            fileInfo.classList.remove('hidden');
+            uploadBtn.disabled = false;
+            hideError();
+        }
+        
+        function clearSelectedFile() {
+            selectedFile = null;
+            pdfInput.value = '';
+            
+            dropContent.classList.remove('hidden');
+            fileInfo.classList.add('hidden');
+            uploadBtn.disabled = true;
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+        
+        function hideError() {
+            errorMessage.classList.add('hidden');
+        }
+        
+        function resetUploadState() {
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Import Presentation';
+            progressContainer.classList.add('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressStatus.textContent = 'Uploading...';
+        }
+        
+        // Form submission
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!selectedFile) {
+                showError('Please select a PDF file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('pdf', selectedFile);
+            formData.append('title', document.getElementById('title').value || '');
+            
+            uploadBtn.disabled = true;
+            progressContainer.classList.remove('hidden');
+            hideError();
+            
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        progressBar.style.width = percent + '%';
+                        progressPercent.textContent = percent + '%';
+                        
+                        if (percent === 100) {
+                            progressStatus.textContent = 'Processing slides...';
+                        }
+                    }
+                });
+                
+                xhr.addEventListener('load', () => {
+                    try {
+                        if (xhr.status === 200) {
+                            const data = JSON.parse(xhr.responseText);
+                            if (data.success) {
+                                document.getElementById('successMessage').textContent = data.message;
+                                document.getElementById('successModal').classList.remove('hidden');
+                            } else {
+                                showError(data.error || 'Import failed');
+                                resetUploadState();
+                            }
+                        } else if (xhr.status === 413) {
+                            showError('File too large. Maximum size is 100MB.');
+                            resetUploadState();
+                        } else {
+                            // Try to parse error response
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                showError(data.error || 'Upload failed');
+                            } catch (e) {
+                                showError('Upload failed (status ' + xhr.status + ')');
+                            }
+                            resetUploadState();
+                        }
+                    } catch (err) {
+                        console.error('Response processing error:', err);
+                        showError('Failed to process server response');
+                        resetUploadState();
+                    }
+                });
+                
+                xhr.addEventListener('error', () => {
+                    showError('Network error - please check your connection and try again');
+                    resetUploadState();
+                });
+                
+                xhr.open('POST', '/api/pdf/upload');
+                xhr.send(formData);
+                
+            } catch (err) {
+                console.error('Upload error:', err);
+                showError(err.message || 'Failed to upload PDF');
+                uploadBtn.disabled = false;
+                progressContainer.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

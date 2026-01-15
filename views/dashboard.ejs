@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- include('partials/head') %>
+    <title>Dashboard - StrideShow</title>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <%- include('partials/navbar-tw') %>
+    
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Welcome, <%= user.name || user.email %></h1>
+                <p class="text-gray-500 mt-1">Manage your presentations</p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <a href="/dashboard/import" class="inline-flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-primary-500 rounded-full font-medium text-gray-700 hover:bg-primary-500 hover:text-white transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    Import PDF
+                </a>
+                <a href="/dashboard/create" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full font-medium hover:shadow-lg hover:shadow-primary-500/30 transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    New Slideshow
+                </a>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid sm:grid-cols-3 gap-4 mb-12">
+            <a href="/connect" class="flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-200 transition-all group">
+                <div class="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center text-2xl group-hover:bg-primary-100 transition-colors">📱</div>
+                <div>
+                    <h3 class="font-semibold text-gray-800">Connect to Screen</h3>
+                    <p class="text-sm text-gray-500">Enter a code to control a display</p>
+                </div>
+            </a>
+            <a href="/go" target="_blank" class="flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-200 transition-all group">
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-2xl group-hover:bg-blue-100 transition-colors">🖥️</div>
+                <div>
+                    <h3 class="font-semibold text-gray-800">Open Display</h3>
+                    <p class="text-sm text-gray-500">Open on your TV or projector</p>
+                </div>
+            </a>
+            <a href="/dashboard/import" class="flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-200 transition-all group">
+                <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center text-2xl group-hover:bg-purple-100 transition-colors">📄</div>
+                <div>
+                    <h3 class="font-semibold text-gray-800">Import from PDF</h3>
+                    <p class="text-sm text-gray-500">PowerPoint, Keynote, Slides → PDF</p>
+                </div>
+            </a>
+        </div>
+
+        <!-- Slideshows Section -->
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">Your Slideshows</h2>
+        
+        <% if (slideshows.length === 0) { %>
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                <div class="text-6xl mb-4">📊</div>
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">No slideshows yet</h3>
+                <p class="text-gray-500 mb-6">Create your first slideshow to get started</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="/dashboard/create" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full font-medium hover:shadow-lg hover:shadow-primary-500/30 transition-all">
+                        Create Slideshow
+                    </a>
+                    <a href="/dashboard/import" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-full font-medium hover:border-primary-500 hover:text-primary-600 transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                        </svg>
+                        Import from PDF
+                    </a>
+                </div>
+            </div>
+        <% } else { %>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <% slideshows.forEach(show => { %>
+                    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-200 transition-all overflow-hidden group">
+                        <div class="p-6">
+                            <div class="flex items-start justify-between mb-3">
+                                <h3 class="text-lg font-semibold text-gray-800 truncate flex-1"><%= show.title %></h3>
+                                <!-- Delete button -->
+                                <button onclick="deleteSlideshow(<%= show.id %>, '<%= show.title.replace(/'/g, "\\'") %>')" 
+                                        class="ml-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                        title="Delete slideshow">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-500 mb-5">
+                                <%= show.slide_count || 0 %> slides • Updated <%= new Date(show.updated_at).toLocaleDateString() %>
+                            </p>
+                            <div class="flex gap-3">
+                                <a href="/dashboard/slideshow/<%= show.id %>" class="flex-1 text-center py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+                                    Edit
+                                </a>
+                                <a href="/connect" class="flex-1 text-center py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-primary-500/30 transition-all">
+                                    Present
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-800 mb-2">Delete Slideshow?</h2>
+                <p class="text-gray-500 mb-6">Are you sure you want to delete "<span id="deleteTitle" class="font-medium text-gray-700"></span>"? This action cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button onclick="closeDeleteModal()" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="confirmDelete()" class="flex-1 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <%- include('partials/footer-tw') %>
+
+    <script>
+        let slideshowToDelete = null;
+
+        function deleteSlideshow(id, title) {
+            slideshowToDelete = id;
+            document.getElementById('deleteTitle').textContent = title;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            slideshowToDelete = null;
+            document.getElementById('deleteModal').classList.add('hidden');
+        }
+
+        async function confirmDelete() {
+            if (!slideshowToDelete) return;
+
+            try {
+                const response = await fetch('/api/slideshows/' + slideshowToDelete, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to delete slideshow');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to delete slideshow');
+            }
+
+            closeDeleteModal();
+        }
+
+        // Close modal on outside click
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteModal();
+            }
+        });
+
+        // Close modal on ESC key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeDeleteModal();
+            }
+        });
+    </script>
+</body>
+</html>

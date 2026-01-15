@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StrideShow Display</title>
+    <link rel="icon" type="image/png" href="/strideshow-icon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            500: '#00d4aa',
+                            600: '#00a085',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Base body styles for waiting screen - light gray background */
+        body.waiting-mode {
+            background: linear-gradient(to bottom right, #f3f4f6, #e5e7eb);
+        }
+        
+        /* Body styles for presenting mode */
+        body.presenting-mode {
+            background: #000;
+        }
+        
+        /* Waiting screen styles */
+        .waiting-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .screen-code {
+            font-family: 'Courier New', monospace;
+            letter-spacing: 12px;
+            text-shadow: 0 0 30px rgba(0, 212, 170, 0.3);
+        }
+        
+        /* Presentation screen */
+        .presentation-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .presentation-screen.active {
+            display: flex;
+        }
+        
+        .presentation-screen img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .slide-text {
+            color: white;
+            font-size: 4rem;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        /* Fullscreen hint */
+        .fullscreen-hint {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 1rem;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .fullscreen-hint.visible {
+            opacity: 1;
+        }
+
+        /* Fullscreen button */
+        .fullscreen-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 100;
+            transition: all 0.3s;
+        }
+        
+        .fullscreen-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Auto-fullscreen prompt - Light gray theme */
+        .fullscreen-prompt {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(to bottom right, #f3f4f6, #e5e7eb);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10001;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .fullscreen-prompt.hidden {
+            display: none;
+        }
+
+        /* Connection status badge styles */
+        .status-waiting {
+            background: rgba(245, 158, 11, 0.1);
+            color: #d97706;
+        }
+        
+        .status-connected {
+            background: rgba(0, 212, 170, 0.1);
+            color: #00a085;
+        }
+    </style>
+</head>
+<body class="waiting-mode min-h-screen">
+
+    <!-- Fullscreen Prompt (shown on first load) - Light theme -->
+    <div class="fullscreen-prompt" id="fullscreenPrompt">
+        <img src="/strideshow-logo.png" alt="StrideShow" class="h-16 mb-8">
+        <h2 class="text-3xl font-bold mb-4 text-gray-800">Ready to Present?</h2>
+        <p class="text-xl text-gray-600 mb-8 max-w-md">For the best experience, click below to enter fullscreen mode.</p>
+        <button onclick="startFullscreen()" class="bg-primary-500 hover:bg-primary-600 text-white px-10 py-4 rounded-full text-xl font-semibold transition-all hover:scale-105 flex items-center gap-3 shadow-lg shadow-primary-500/30">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+            </svg>
+            Enter Fullscreen
+        </button>
+        <button onclick="skipFullscreen()" class="mt-6 text-gray-500 hover:text-gray-700 underline">
+            Continue without fullscreen
+        </button>
+    </div>
+
+    <!-- Waiting Screen -->
+    <div class="waiting-screen" id="waitingScreen">
+        <div class="mb-8">
+            <img src="/strideshow-logo.png" alt="StrideShow" class="h-16 md:h-20 mx-auto">
+        </div>
+        
+        <div class="bg-white rounded-3xl shadow-xl p-8 md:p-12 mb-8 border border-gray-200">
+            <p class="text-gray-500 text-lg mb-4">Enter this code on your device</p>
+            <div class="screen-code text-5xl md:text-7xl font-bold text-primary-500" id="screenCode">------</div>
+        </div>
+        
+        <div class="bg-white p-5 rounded-2xl shadow-lg mb-8 border border-gray-200">
+            <img id="qrCode" src="" alt="QR Code" class="w-48 h-48 md:w-56 md:h-56">
+        </div>
+        
+        <p class="text-gray-600 text-lg max-w-md leading-relaxed">
+            Scan the QR code or visit <span class="text-primary-600 font-semibold"><%= baseUrl %>/connect</span> and enter the code above
+        </p>
+    </div>
+    
+    <!-- Connection Status -->
+    <div class="fixed top-5 right-5 px-5 py-2.5 rounded-full text-sm font-medium status-waiting" id="connectionStatus">
+        <span class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            Waiting for presenter...
+        </span>
+    </div>
+    
+    <!-- Presenter Info -->
+    <div class="fixed bottom-5 left-5 px-5 py-2.5 bg-white/90 backdrop-blur rounded-xl text-sm text-gray-600 shadow-lg border border-gray-200 hidden" id="presenterInfo">
+        Controlled by: <span class="font-semibold text-gray-800" id="presenterName"></span>
+    </div>
+
+    <!-- Fullscreen Button -->
+    <button class="fullscreen-btn bg-white shadow-lg rounded-full p-4 hover:shadow-xl border border-gray-200" id="fullscreenBtn" onclick="toggleFullscreen()" title="Toggle Fullscreen (F)">
+        <svg id="fullscreenIcon" class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+        </svg>
+        <svg id="exitFullscreenIcon" class="w-6 h-6 text-gray-700 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4H4m0 0l5 5M9 15v5H4m0 0l5-5m11-11h-5v5m5-5l-5 5m5 11h-5v-5m5 5l-5-5"/>
+        </svg>
+    </button>
+    
+    <!-- Presentation Screen -->
+    <div class="presentation-screen" id="presentationScreen">
+        <img id="slideImage" src="" alt="Slide">
+        <div class="slide-text hidden" id="slideText"></div>
+    </div>
+    
+    <!-- Fullscreen Hint -->
+    <div class="fullscreen-hint" id="fullscreenHint">Press F or click to toggle fullscreen</div>
+
+    <script>
+        const screenId = "<%= screenId %>";
+        let ws;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+        let isPresenting = false;
+        let userWantsFullscreen = false;
+
+        // Check if we should show the fullscreen prompt
+        function checkFullscreenPrompt() {
+            // Check if user has already made a choice this session
+            const promptShown = sessionStorage.getItem('fullscreenPromptShown');
+            if (promptShown) {
+                document.getElementById('fullscreenPrompt').classList.add('hidden');
+                // If they chose fullscreen before, try to restore it
+                if (sessionStorage.getItem('userWantsFullscreen') === 'true') {
+                    userWantsFullscreen = true;
+                }
+            }
+        }
+
+        function startFullscreen() {
+            userWantsFullscreen = true;
+            sessionStorage.setItem('fullscreenPromptShown', 'true');
+            sessionStorage.setItem('userWantsFullscreen', 'true');
+            document.getElementById('fullscreenPrompt').classList.add('hidden');
+            enterFullscreen();
+        }
+
+        function skipFullscreen() {
+            userWantsFullscreen = false;
+            sessionStorage.setItem('fullscreenPromptShown', 'true');
+            sessionStorage.setItem('userWantsFullscreen', 'false');
+            document.getElementById('fullscreenPrompt').classList.add('hidden');
+        }
+
+        function connect() {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            ws = new WebSocket(protocol + "//" + window.location.host + "/ws");
+
+            ws.onopen = function() {
+                console.log("WebSocket connected");
+                reconnectAttempts = 0;
+                ws.send(JSON.stringify({
+                    type: "register-display",
+                    screenId: screenId
+                }));
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log("Received:", data);
+
+                switch(data.type) {
+                    case "display-registered":
+                        document.getElementById("screenCode").textContent = data.screenCode;
+                        document.getElementById("qrCode").src = data.qrCodeUrl;
+                        break;
+                    case "presenter-connected":
+                        updateConnectionStatus(true, data.presenterName);
+                        break;
+                    case "slideshow-started":
+                        startPresentation(data.slide);
+                        break;
+                    case "slide-changed":
+                        showSlide(data.slide);
+                        break;
+                    case "slideshow-ended":
+                        endPresentation();
+                        break;
+                    case "presenter-disconnected":
+                        updateConnectionStatus(false);
+                        break;
+                }
+            };
+
+            ws.onclose = function() {
+                console.log("WebSocket disconnected");
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    setTimeout(connect, 2000 * reconnectAttempts);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error("WebSocket error:", error);
+            };
+        }
+
+        function updateConnectionStatus(connected, presenterName) {
+            const status = document.getElementById("connectionStatus");
+            const presenterInfo = document.getElementById("presenterInfo");
+            
+            if (connected) {
+                status.innerHTML = `<span class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-primary-500"></span>
+                    Presenter connected
+                </span>`;
+                status.className = "fixed top-5 right-5 px-5 py-2.5 rounded-full text-sm font-medium status-connected";
+                
+                presenterInfo.classList.remove("hidden");
+                presenterInfo.style.display = "block";
+                document.getElementById("presenterName").textContent = presenterName || "Unknown";
+            } else {
+                status.innerHTML = `<span class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    Waiting for presenter...
+                </span>`;
+                status.className = "fixed top-5 right-5 px-5 py-2.5 rounded-full text-sm font-medium status-waiting";
+                
+                presenterInfo.classList.add("hidden");
+                presenterInfo.style.display = "none";
+            }
+        }
+
+        function startPresentation(slide) {
+            isPresenting = true;
+            
+            // Switch body class to presenting mode
+            document.body.classList.remove('waiting-mode');
+            document.body.classList.add('presenting-mode');
+            
+            // Hide waiting screen elements
+            document.getElementById("waitingScreen").style.display = "none";
+            document.getElementById("connectionStatus").style.display = "none";
+            document.getElementById("presenterInfo").style.display = "none";
+            document.getElementById("fullscreenBtn").style.display = "none";
+            
+            // Show presentation
+            document.getElementById("presentationScreen").classList.add("active");
+            showSlide(slide);
+            
+            // Enter fullscreen if user wants it and we're not already in fullscreen
+            if (userWantsFullscreen && !document.fullscreenElement) {
+                enterFullscreen();
+            }
+            showFullscreenHint();
+        }
+
+        function showSlide(slide) {
+            console.log("Showing slide:", slide);
+            const slideImage = document.getElementById("slideImage");
+            const slideText = document.getElementById("slideText");
+            
+            if (slide && slide.image_url) {
+                slideImage.src = slide.image_url;
+                slideImage.style.display = "block";
+                slideText.style.display = "none";
+            } else if (slide && slide.content) {
+                slideText.textContent = slide.content;
+                slideText.style.display = "block";
+                slideImage.style.display = "none";
+            } else {
+                slideText.textContent = "Slide";
+                slideText.style.display = "block";
+                slideImage.style.display = "none";
+            }
+        }
+
+        function endPresentation() {
+            isPresenting = false;
+            
+            // DON'T exit fullscreen - keep it persistent!
+            // User can manually exit if they want
+            
+            // Switch body class back to waiting mode
+            document.body.classList.remove('presenting-mode');
+            document.body.classList.add('waiting-mode');
+            
+            // Hide presentation screen
+            document.getElementById("presentationScreen").classList.remove("active");
+            
+            // Restore waiting screen with proper styles
+            const waitingScreen = document.getElementById("waitingScreen");
+            waitingScreen.style.display = "flex";
+            waitingScreen.style.flexDirection = "column";
+            waitingScreen.style.alignItems = "center";
+            waitingScreen.style.justifyContent = "center";
+            waitingScreen.style.minHeight = "100vh";
+            waitingScreen.style.textAlign = "center";
+            waitingScreen.style.padding = "40px";
+            
+            // Restore connection status
+            const status = document.getElementById("connectionStatus");
+            status.style.display = "block";
+            status.innerHTML = `<span class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                Waiting for presenter...
+            </span>`;
+            status.className = "fixed top-5 right-5 px-5 py-2.5 rounded-full text-sm font-medium status-waiting";
+            
+            // Show fullscreen button again
+            document.getElementById("fullscreenBtn").style.display = "block";
+            
+            // Hide presenter info
+            const presenterInfo = document.getElementById("presenterInfo");
+            presenterInfo.style.display = "none";
+            presenterInfo.classList.add("hidden");
+        }
+
+        function enterFullscreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(function(err) {
+                    console.log("Fullscreen request failed:", err);
+                });
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            }
+        }
+
+        function exitFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(function() {});
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                userWantsFullscreen = true;
+                sessionStorage.setItem('userWantsFullscreen', 'true');
+                enterFullscreen();
+            } else {
+                userWantsFullscreen = false;
+                sessionStorage.setItem('userWantsFullscreen', 'false');
+                exitFullscreen();
+            }
+        }
+
+        function updateFullscreenButton() {
+            const enterIcon = document.getElementById('fullscreenIcon');
+            const exitIcon = document.getElementById('exitFullscreenIcon');
+            
+            if (document.fullscreenElement) {
+                enterIcon.classList.add('hidden');
+                exitIcon.classList.remove('hidden');
+            } else {
+                enterIcon.classList.remove('hidden');
+                exitIcon.classList.add('hidden');
+            }
+        }
+
+        function showFullscreenHint() {
+            const hint = document.getElementById("fullscreenHint");
+            hint.classList.add("visible");
+            setTimeout(function() {
+                hint.classList.remove("visible");
+            }, 3000);
+        }
+
+        // Listen for fullscreen changes
+        document.addEventListener('fullscreenchange', updateFullscreenButton);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+
+        // Click to toggle fullscreen during presentation
+        document.getElementById("presentationScreen").addEventListener("click", function() {
+            toggleFullscreen();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "f" || e.key === "F" || e.key === "F11") {
+                e.preventDefault();
+                toggleFullscreen();
+            }
+            // ESC key - if pressed during presentation, don't exit fullscreen automatically
+            // The browser handles ESC for fullscreen, but we want to remember the preference
+            if (e.key === "Escape" && document.fullscreenElement) {
+                userWantsFullscreen = false;
+                sessionStorage.setItem('userWantsFullscreen', 'false');
+            }
+        });
+
+        // Prevent context menu during presentation
+        document.getElementById("presentationScreen").addEventListener("contextmenu", function(e) {
+            e.preventDefault();
+        });
+
+        // Initialize
+        checkFullscreenPrompt();
+        connect();
+    </script>
+</body>
+</html>

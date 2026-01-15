@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- include('partials/head') %>
+    <title><%= slideshow.title %> - StrideShow</title>
+    <style>
+        .slide-card.dragging {
+            opacity: 0.5;
+            transform: scale(1.02);
+        }
+        .slide-card.drag-over {
+            border-color: #00d4aa !important;
+            box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.3);
+        }
+        .drag-handle {
+            cursor: grab;
+        }
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <%- include('partials/navbar-tw') %>
+    
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <div class="flex items-center gap-4">
+                <a href="/dashboard" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 id="slideshowTitle" class="text-2xl font-bold text-gray-800"><%= slideshow.title %></h1>
+                        <button onclick="editSlideshowTitle()" class="text-gray-400 hover:text-primary-500 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-gray-500 text-sm mt-1"><%= slides.length %> slides</p>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <a href="/connect" class="px-6 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full font-medium hover:shadow-lg hover:shadow-primary-500/30 transition-all">
+                    Present
+                </a>
+            </div>
+        </div>
+
+        <!-- Add Slide Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+            <h3 class="font-semibold text-gray-800 mb-4">Add New Slide</h3>
+            <form id="addSlideForm" enctype="multipart/form-data">
+                <div id="uploadArea" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-primary-400 hover:bg-primary-50/50 transition-all cursor-pointer">
+                    <input type="file" id="imageFile" name="image" accept="image/*" class="hidden">
+                    <svg class="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <p class="text-gray-600 font-medium">Click to upload or drag and drop</p>
+                    <p class="text-gray-400 text-sm mt-1">PNG, JPG, GIF, WebP (max 10MB)</p>
+                </div>
+                
+                <div id="previewContainer" class="hidden mt-4">
+                    <div class="flex items-start gap-4">
+                        <img id="previewImage" class="w-48 h-32 object-cover rounded-lg" src="" alt="Preview">
+                        <div class="flex-1">
+                            <input type="text" id="newSlideTitle" name="title" placeholder="Slide title (optional)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-2">
+                            <textarea id="newSlideNotes" name="notes" rows="2" placeholder="Speaker notes (optional)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
+                        </div>
+                        <button type="button" onclick="removePreview()" class="text-red-500 hover:text-red-700">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="uploadProgress" class="hidden mt-4">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="progressBar" class="bg-primary-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                        </div>
+                        <p id="uploadStatus" class="text-sm text-gray-500 mt-1">Uploading...</p>
+                    </div>
+                    <button type="submit" id="submitBtn" class="mt-4 px-6 py-2.5 bg-primary-500 text-white rounded-lg font-medium hover:bg-primary-600 transition-colors">
+                        Add Slide
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Slides Grid -->
+        <div class="mb-4 flex items-center justify-between">
+            <h3 class="font-semibold text-gray-800">Slides</h3>
+            <p class="text-sm text-gray-500">Drag slides to reorder</p>
+        </div>
+        
+        <% if (slides.length === 0) { %>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+                <div class="text-5xl mb-4">📊</div>
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">No slides yet</h3>
+                <p class="text-gray-500">Add your first slide above to get started</p>
+            </div>
+        <% } else { %>
+            <div id="slidesGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <% slides.forEach((slide, index) => { %>
+                    <div class="slide-card bg-white rounded-2xl shadow-sm border-2 border-gray-100 overflow-hidden hover:shadow-md transition-all" 
+                         data-slide-id="<%= slide.id %>" draggable="true">
+                        <!-- Drag Handle -->
+                        <div class="drag-handle bg-gray-50 px-4 py-2 flex items-center justify-between border-b border-gray-100">
+                            <span class="text-sm font-medium text-gray-500">Slide <%= index + 1 %></span>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+                            </svg>
+                        </div>
+                        
+                        <!-- Slide Preview -->
+                        <div class="aspect-video bg-gray-100 relative">
+                            <% if (slide.content_url || slide.thumbnail_url) { %>
+                                <img src="<%= slide.content_url || slide.thumbnail_url %>" alt="Slide <%= index + 1 %>" class="w-full h-full object-contain">
+                            <% } else { %>
+                                <div class="w-full h-full flex items-center justify-center text-4xl text-gray-300">
+                                    <%= index + 1 %>
+                                </div>
+                            <% } %>
+                        </div>
+                        
+                        <!-- Slide Info -->
+                        <div class="p-4">
+                            <div class="mb-3">
+                                <p class="font-medium text-gray-800 truncate" id="slideTitle-<%= slide.id %>">
+                                    <%= slide.title || 'Untitled slide' %>
+                                </p>
+                                <p class="text-sm text-gray-500 truncate" id="slideNotes-<%= slide.id %>">
+                                    <%= slide.notes || 'No notes' %>
+                                </p>
+                            </div>
+                            
+                            <!-- Actions -->
+                            <div class="flex gap-2">
+                                <button onclick="editSlide(<%= slide.id %>, '<%= (slide.title || '').replace(/'/g, "\\'") %>', '<%= (slide.notes || '').replace(/'/g, "\\'").replace(/\n/g, "\\n") %>')" 
+                                        class="flex-1 py-2 px-3 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                                    Edit
+                                </button>
+                                <button onclick="deleteSlide(<%= slide.id %>)" 
+                                        class="py-2 px-3 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- Edit Slide Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl p-8 max-w-lg w-full mx-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">Edit Slide</h2>
+            <form id="editSlideForm">
+                <input type="hidden" id="editSlideId">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Slide Title</label>
+                    <input type="text" id="editSlideTitle" placeholder="Enter slide title" 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Speaker Notes</label>
+                    <textarea id="editSlideNotes" rows="4" placeholder="Enter speaker notes" 
+                              class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Slideshow Title Modal -->
+    <div id="editTitleModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-6">Edit Slideshow Title</h2>
+            <form id="editTitleForm">
+                <div class="mb-6">
+                    <input type="text" id="editSlideshowTitle" placeholder="Enter slideshow title" 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeEditTitleModal()" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <%- include('partials/footer-tw') %>
+
+    <script>
+        const slideshowId = <%= slideshow.id %>;
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('imageFile');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewImage = document.getElementById('previewImage');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressBar = document.getElementById('progressBar');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        let selectedFile = null;
+        let draggedElement = null;
+
+        // File upload handling
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('border-primary-500', 'bg-primary-50');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('border-primary-500', 'bg-primary-50');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('border-primary-500', 'bg-primary-50');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size must be less than 10MB');
+                return;
+            }
+            
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewContainer.classList.remove('hidden');
+                uploadArea.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removePreview() {
+            selectedFile = null;
+            fileInput.value = '';
+            previewContainer.classList.add('hidden');
+            uploadArea.classList.remove('hidden');
+            document.getElementById('newSlideTitle').value = '';
+            document.getElementById('newSlideNotes').value = '';
+        }
+
+        document.getElementById('addSlideForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!selectedFile) {
+                alert('Please select an image');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            formData.append('title', document.getElementById('newSlideTitle').value);
+            formData.append('notes', document.getElementById('newSlideNotes').value);
+            
+            submitBtn.disabled = true;
+            uploadProgress.classList.remove('hidden');
+            
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = (e.loaded / e.total) * 100;
+                    progressBar.style.width = percent + '%';
+                    uploadStatus.textContent = 'Uploading... ' + Math.round(percent) + '%';
+                }
+            });
+            
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    uploadStatus.textContent = 'Upload complete!';
+                    setTimeout(() => window.location.reload(), 500);
+                } else {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        alert(data.error || 'Failed to add slide');
+                    } catch (e) {
+                        alert('Failed to add slide');
+                    }
+                    submitBtn.disabled = false;
+                    uploadProgress.classList.add('hidden');
+                }
+            });
+            
+            xhr.addEventListener('error', () => {
+                alert('Upload failed. Please try again.');
+                submitBtn.disabled = false;
+                uploadProgress.classList.add('hidden');
+            });
+            
+            xhr.open('POST', '/api/slideshows/' + slideshowId + '/slides');
+            xhr.send(formData);
+        });
+
+        // Drag and drop reordering
+        const slidesGrid = document.getElementById('slidesGrid');
+        if (slidesGrid) {
+            const cards = slidesGrid.querySelectorAll('.slide-card');
+            
+            cards.forEach(card => {
+                card.addEventListener('dragstart', (e) => {
+                    draggedElement = card;
+                    card.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                    draggedElement = null;
+                    saveNewOrder();
+                });
+                
+                card.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    
+                    if (draggedElement && draggedElement !== card) {
+                        card.classList.add('drag-over');
+                        
+                        const rect = card.getBoundingClientRect();
+                        const midpoint = rect.left + rect.width / 2;
+                        
+                        if (e.clientX < midpoint) {
+                            slidesGrid.insertBefore(draggedElement, card);
+                        } else {
+                            slidesGrid.insertBefore(draggedElement, card.nextSibling);
+                        }
+                    }
+                });
+                
+                card.addEventListener('dragleave', () => {
+                    card.classList.remove('drag-over');
+                });
+                
+                card.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    card.classList.remove('drag-over');
+                });
+            });
+        }
+
+        async function saveNewOrder() {
+            const cards = document.querySelectorAll('.slide-card');
+            const slideOrder = Array.from(cards).map(card => parseInt(card.dataset.slideId));
+            
+            // Update slide numbers in UI
+            cards.forEach((card, index) => {
+                const slideNum = card.querySelector('.drag-handle span');
+                if (slideNum) {
+                    slideNum.textContent = 'Slide ' + (index + 1);
+                }
+            });
+            
+            try {
+                const response = await fetch('/api/slideshows/' + slideshowId + '/reorder', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ slideOrder })
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to save order');
+                }
+            } catch (error) {
+                console.error('Error saving order:', error);
+            }
+        }
+
+        // Edit slide modal
+        function editSlide(slideId, title, notes) {
+            document.getElementById('editSlideId').value = slideId;
+            document.getElementById('editSlideTitle').value = title || '';
+            document.getElementById('editSlideNotes').value = notes ? notes.replace(/\\n/g, '\n') : '';
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        document.getElementById('editSlideForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const slideId = document.getElementById('editSlideId').value;
+            const title = document.getElementById('editSlideTitle').value;
+            const notes = document.getElementById('editSlideNotes').value;
+            
+            try {
+                const response = await fetch('/api/slides/' + slideId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, notes })
+                });
+                
+                if (response.ok) {
+                    // Update UI
+                    document.getElementById('slideTitle-' + slideId).textContent = title || 'Untitled slide';
+                    document.getElementById('slideNotes-' + slideId).textContent = notes || 'No notes';
+                    closeEditModal();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to update slide');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to update slide');
+            }
+        });
+
+        // Edit slideshow title
+        function editSlideshowTitle() {
+            document.getElementById('editSlideshowTitle').value = document.getElementById('slideshowTitle').textContent;
+            document.getElementById('editTitleModal').classList.remove('hidden');
+        }
+
+        function closeEditTitleModal() {
+            document.getElementById('editTitleModal').classList.add('hidden');
+        }
+
+        document.getElementById('editTitleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const title = document.getElementById('editSlideshowTitle').value.trim();
+            if (!title) {
+                alert('Title is required');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/slideshows/' + slideshowId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('slideshowTitle').textContent = title;
+                    document.title = title + ' - StrideShow';
+                    closeEditTitleModal();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to update title');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to update title');
+            }
+        });
+
+        // Delete slide
+        async function deleteSlide(slideId) {
+            if (!confirm('Are you sure you want to delete this slide?')) return;
+            
+            try {
+                const response = await fetch('/api/slides/' + slideId, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Failed to delete slide');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to delete slide');
+            }
+        }
+
+        // Close modals on outside click
+        document.getElementById('editModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('editModal')) {
+                closeEditModal();
+            }
+        });
+        
+        document.getElementById('editTitleModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('editTitleModal')) {
+                closeEditTitleModal();
+            }
+        });
+    </script>
+</body>
+</html>

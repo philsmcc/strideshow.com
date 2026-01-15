@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StrideShow - Present from Any Device</title>
+    <link rel="icon" type="image/png" href="/strideshow-icon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+        .hero {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+        .hero-logo {
+            max-width: 350px;
+            margin-bottom: 30px;
+        }
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        .hero p {
+            font-size: 1.2rem;
+            color: #aaa;
+            max-width: 600px;
+            margin: 0 auto 40px;
+            line-height: 1.6;
+        }
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 15px 35px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
+            color: white;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        .features {
+            padding: 80px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .features h2 {
+            text-align: center;
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 50px;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        .feature-card {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        .feature-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+        .how-it-works {
+            background: white;
+            padding: 80px 20px;
+        }
+        .how-it-works h2 {
+            text-align: center;
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 50px;
+        }
+        .steps {
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+        }
+        .step {
+            text-align: center;
+        }
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0 auto 20px;
+        }
+        .step h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .step p {
+            color: #666;
+            line-height: 1.5;
+        }
+        .cta {
+            background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .cta h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+        .cta p {
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .cta .btn {
+            background: white;
+            color: #00a085;
+        }
+    </style>
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    
+    <section class="hero">
+        <img src="/strideshow-logo.png" alt="StrideShow" class="hero-logo">
+        <h1>Present from Any Device</h1>
+        <p>Control your presentations from your phone while displaying on any screen. No cables, no apps to install - just scan a code and present.</p>
+        <div class="hero-buttons">
+            <a href="/register" class="btn btn-primary">Get Started Free</a>
+            <a href="/go" class="btn btn-secondary">Open Display Screen</a>
+        </div>
+    </section>
+
+    <section class="features">
+        <h2>Why StrideShow?</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Control from Your Phone</h3>
+                <p>Use your smartphone as a remote control. Navigate slides, view speaker notes, and manage your presentation with ease.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🖥️</div>
+                <h3>Display Anywhere</h3>
+                <p>Open the display on any device with a browser - TVs, projectors, laptops. No special software required.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔗</div>
+                <h3>Instant Connection</h3>
+                <p>Just scan a QR code or enter a 6-digit code. Connect to any display in seconds without complex setup.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="how-it-works">
+        <h2>How It Works</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>Open Display</h3>
+                <p>Go to /go on your TV or projector browser to show the connection code.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>Connect</h3>
+                <p>Scan the QR code or enter the code on your phone to connect as presenter.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>Present</h3>
+                <p>Select your slideshow and control the presentation from your device!</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta">
+        <h2>Ready to Transform Your Presentations?</h2>
+        <p>Join thousands of presenters who've simplified their workflow with StrideShow.</p>
+        <a href="/register" class="btn">Create Free Account</a>
+    </section>
+
+    <%- include('partials/footer') %>
+</body>
+</html>

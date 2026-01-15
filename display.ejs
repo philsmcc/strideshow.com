@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StrideShow Display</title>
+    <link rel="icon" type="image/png" href="/strideshow-icon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .waiting-screen {
+            text-align: center;
+            padding: 40px;
+        }
+        .logo {
+            margin-bottom: 30px;
+        }
+        .logo img {
+            max-width: 400px;
+            height: auto;
+        }
+        .code-display {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px 60px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        .code-label {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-bottom: 15px;
+        }
+        .screen-code {
+            font-size: 5rem;
+            font-weight: bold;
+            letter-spacing: 15px;
+            font-family: "Courier New", monospace;
+            color: #00d4aa;
+            text-shadow: 0 0 30px rgba(0, 212, 170, 0.5);
+        }
+        .qr-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        .qr-container img {
+            display: block;
+            width: 200px;
+            height: 200px;
+        }
+        .instructions {
+            color: #888;
+            font-size: 1.1rem;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+        .instructions strong {
+            color: #00d4aa;
+        }
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        .status-connected {
+            background: rgba(0, 212, 170, 0.2);
+            color: #00d4aa;
+        }
+        .status-disconnected {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+        .presenter-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: #aaa;
+            display: none;
+        }
+        .presenter-info.active {
+            display: block;
+        }
+        .presentation-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 9999;
+        }
+        .presentation-screen.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .presentation-screen img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .slide-text {
+            color: white;
+            font-size: 4rem;
+            text-align: center;
+            padding: 40px;
+        }
+        .fullscreen-hint {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 1rem;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .fullscreen-hint.visible {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="waiting-screen" id="waitingScreen">
+        <div class="logo">
+            <img src="/strideshow-logo.png" alt="StrideShow">
+        </div>
+        <div class="code-display">
+            <div class="code-label">Enter this code on your device</div>
+            <div class="screen-code" id="screenCode">------</div>
+        </div>
+        <div class="qr-container">
+            <img id="qrCode" src="" alt="QR Code">
+        </div>
+        <p class="instructions">
+            Scan the QR code or visit <strong><%= baseUrl %>/connect</strong> and enter the code above to control this screen from your phone or laptop.
+        </p>
+    </div>
+    <div class="connection-status status-disconnected" id="connectionStatus">
+        Waiting for presenter...
+    </div>
+    <div class="presenter-info" id="presenterInfo">
+        Controlled by: <span id="presenterName"></span>
+    </div>
+    <div class="presentation-screen" id="presentationScreen">
+        <img id="slideImage" src="" alt="Slide">
+        <div class="slide-text" id="slideText" style="display: none;"></div>
+    </div>
+    <div class="fullscreen-hint" id="fullscreenHint">Click anywhere to toggle fullscreen</div>
+    <script>
+        const screenId = "<%= screenId %>";
+        let ws;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+        let isPresenting = false;
+
+        function connect() {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            ws = new WebSocket(protocol + "//" + window.location.host + "/ws");
+
+            ws.onopen = function() {
+                console.log("WebSocket connected");
+                reconnectAttempts = 0;
+                ws.send(JSON.stringify({
+                    type: "register-display",
+                    screenId: screenId
+                }));
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log("Received:", data);
+
+                switch(data.type) {
+                    case "display-registered":
+                        document.getElementById("screenCode").textContent = data.screenCode;
+                        document.getElementById("qrCode").src = data.qrCodeUrl;
+                        break;
+                    case "presenter-connected":
+                        document.getElementById("connectionStatus").className = "connection-status status-connected";
+                        document.getElementById("connectionStatus").textContent = "Presenter connected";
+                        document.getElementById("presenterInfo").classList.add("active");
+                        document.getElementById("presenterName").textContent = data.presenterName || "Unknown";
+                        break;
+                    case "slideshow-started":
+                        startPresentation(data.slide);
+                        break;
+                    case "slide-changed":
+                        showSlide(data.slide);
+                        break;
+                    case "slideshow-ended":
+                        endPresentation();
+                        break;
+                    case "presenter-disconnected":
+                        document.getElementById("connectionStatus").className = "connection-status status-disconnected";
+                        document.getElementById("connectionStatus").textContent = "Presenter disconnected";
+                        document.getElementById("presenterInfo").classList.remove("active");
+                        break;
+                }
+            };
+
+            ws.onclose = function() {
+                console.log("WebSocket disconnected");
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    setTimeout(connect, 2000 * reconnectAttempts);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error("WebSocket error:", error);
+            };
+        }
+
+        function startPresentation(slide) {
+            isPresenting = true;
+            document.getElementById("waitingScreen").style.display = "none";
+            document.getElementById("connectionStatus").style.display = "none";
+            document.getElementById("presenterInfo").style.display = "none";
+            document.getElementById("presentationScreen").classList.add("active");
+            showSlide(slide);
+            enterFullscreen();
+            showFullscreenHint();
+        }
+
+        function showSlide(slide) {
+            console.log("Showing slide:", slide);
+            const slideImage = document.getElementById("slideImage");
+            const slideText = document.getElementById("slideText");
+            
+            if (slide && slide.image_url) {
+                slideImage.src = slide.image_url;
+                slideImage.style.display = "block";
+                slideText.style.display = "none";
+            } else if (slide && slide.content) {
+                slideText.textContent = slide.content;
+                slideText.style.display = "block";
+                slideImage.style.display = "none";
+            } else {
+                slideText.textContent = "Slide";
+                slideText.style.display = "block";
+                slideImage.style.display = "none";
+            }
+        }
+
+        function endPresentation() {
+            isPresenting = false;
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(function() {});
+            }
+            document.getElementById("waitingScreen").style.display = "flex";
+            document.getElementById("connectionStatus").style.display = "block";
+            document.getElementById("connectionStatus").className = "connection-status status-disconnected";
+            document.getElementById("connectionStatus").textContent = "Waiting for presenter...";
+            document.getElementById("presenterInfo").style.display = "none";
+            document.getElementById("presenterInfo").classList.remove("active");
+            document.getElementById("presentationScreen").classList.remove("active");
+        }
+
+        function enterFullscreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(function(err) {
+                    console.log("Fullscreen request failed:", err);
+                });
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                enterFullscreen();
+            } else {
+                document.exitFullscreen().catch(function() {});
+            }
+        }
+
+        function showFullscreenHint() {
+            const hint = document.getElementById("fullscreenHint");
+            hint.classList.add("visible");
+            setTimeout(function() {
+                hint.classList.remove("visible");
+            }, 3000);
+        }
+
+        document.getElementById("presentationScreen").addEventListener("click", function() {
+            toggleFullscreen();
+        });
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "f" || e.key === "F" || e.key === "F11") {
+                e.preventDefault();
+                toggleFullscreen();
+            }
+        });
+
+        document.getElementById("presentationScreen").addEventListener("contextmenu", function(e) {
+            e.preventDefault();
+        });
+
+        connect();
+    </script>
+</body>
+</html>

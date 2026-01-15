@@ -1,0 +1,16 @@
+<nav style="background: white; padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+    <a href="/" style="display: flex; align-items: center; text-decoration: none;">
+        <img src="/strideshow-logo.png" alt="StrideShow" style="height: 36px; width: auto;">
+    </a>
+    <div style="display: flex; gap: 15px; align-items: center;">
+        <% if (typeof user !== 'undefined' && user) { %>
+            <a href="/dashboard" style="text-decoration: none; color: #333; font-weight: 500;">Dashboard</a>
+            <a href="/connect" style="text-decoration: none; color: #333; font-weight: 500;">Connect</a>
+            <a href="/auth/logout" style="text-decoration: none; color: #666;">Logout</a>
+        <% } else { %>
+            <a href="/go" style="text-decoration: none; color: #333; font-weight: 500;">Display</a>
+            <a href="/login" style="text-decoration: none; color: #00a085; font-weight: 600;">Login</a>
+            <a href="/register" style="text-decoration: none; background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%); color: white; padding: 10px 20px; border-radius: 25px; font-weight: 500;">Sign Up</a>
+        <% } %>
+    </div>
+</nav>

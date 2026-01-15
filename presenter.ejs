@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Presenter Controls - StrideShow</title>
+    <link rel="icon" type="image/png" href="/strideshow-icon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-logo {
+            height: 32px;
+            width: auto;
+        }
+        .screen-info { font-size: 0.9rem; opacity: 0.9; }
+        .debug-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        .no-slideshow {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            text-align: center;
+        }
+        .no-slideshow h2 { color: #333; margin-bottom: 20px; }
+        .no-slideshow p { color: #666; margin-bottom: 30px; }
+        .slideshow-list { width: 100%; max-width: 400px; }
+        .slideshow-item {
+            background: white;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .slideshow-item:hover { background: #f0fdf9; border: 1px solid #00d4aa; }
+        .slideshow-item .title { font-weight: 600; color: #333; }
+        .slideshow-item .count { color: #666; font-size: 0.9rem; }
+        .presentation-mode {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .current-slide {
+            flex: 2;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 200px;
+        }
+        .current-slide img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .current-slide .slide-text {
+            color: white;
+            font-size: 1.5rem;
+            text-align: center;
+            padding: 20px;
+        }
+        .slide-number {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+        }
+        .notes-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-top: 1px solid #eee;
+            overflow-y: auto;
+            min-height: 80px;
+            max-height: 150px;
+        }
+        .notes-section h3 { color: #00a085; font-size: 0.9rem; margin-bottom: 10px; }
+        .notes-content { color: #333; line-height: 1.6; font-size: 0.95rem; }
+        .notes-content.empty { color: #999; font-style: italic; }
+        .nav-controls {
+            background: white;
+            padding: 15px 20px;
+            display: flex;
+            gap: 15px;
+        }
+        .nav-btn {
+            flex: 1;
+            padding: 25px 20px;
+            font-size: 1.3rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        .nav-btn.prev { background: #e0e0e0; color: #333; }
+        .nav-btn.prev:active { background: #ccc; }
+        .nav-btn.next {
+            background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
+            color: white;
+        }
+        .nav-btn.next:active { opacity: 0.8; }
+        .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .end-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            width: calc(100% - 40px);
+            margin: 10px 20px 20px;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        .connection-status {
+            position: fixed;
+            top: 70px;
+            right: 10px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            z-index: 100;
+        }
+        .status-connected { background: rgba(0, 212, 170, 0.2); color: #00a085; }
+        .status-disconnected { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+        .debug-log {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <img src="/strideshow-logo.png" alt="StrideShow" class="header-logo">
+            <div class="screen-info">Screen: <span id="screenCode"><%= screenCode %></span></div>
+        </div>
+        <button class="debug-btn" onclick="toggleDebug()">Debug</button>
+    </div>
+    <div class="connection-status status-disconnected" id="connectionStatus">Connecting...</div>
+
+    <div class="no-slideshow" id="noSlideshow">
+        <h2>Select a Slideshow</h2>
+        <p>Choose a presentation to display on the connected screen</p>
+        <div class="slideshow-list" id="slideshowList">Loading...</div>
+    </div>
+
+    <div class="presentation-mode" id="presentationMode" style="display: none;">
+        <div class="current-slide">
+            <img id="slideImage" src="" alt="Slide" style="display: none;">
+            <div class="slide-text" id="slideText"></div>
+            <div class="slide-number"><span id="currentNum">1</span> / <span id="totalNum">1</span></div>
+        </div>
+        <div class="notes-section">
+            <h3>Speaker Notes</h3>
+            <div class="notes-content" id="notesContent">No notes</div>
+        </div>
+        <div class="nav-controls">
+            <button class="nav-btn prev" id="prevBtn">← Prev</button>
+            <button class="nav-btn next" id="nextBtn">Next →</button>
+        </div>
+        <button class="end-btn" id="endBtn">End Presentation</button>
+    </div>
+
+    <div class="debug-log" id="debugLog"></div>
+
+    <script>
+        const screenCode = "<%= screenCode %>";
+        const userId = "<%= user.id %>";
+        const userName = "<%= user.name || user.email %>";
+        
+        let ws = null;
+        let slides = [];
+        let currentSlideIndex = 0;
+        let isConnected = false;
+
+        function log(msg) {
+            console.log("[Presenter]", msg);
+            const debugLog = document.getElementById("debugLog");
+            const time = new Date().toLocaleTimeString();
+            debugLog.innerHTML += time + ": " + msg + "<br>";
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        function toggleDebug() {
+            const d = document.getElementById("debugLog");
+            d.style.display = d.style.display === "none" ? "block" : "none";
+        }
+
+        function connect() {
+            log("Connecting to WebSocket...");
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            ws = new WebSocket(protocol + "//" + window.location.host + "/ws");
+
+            ws.onopen = function() {
+                log("WebSocket connected!");
+                isConnected = true;
+                document.getElementById("connectionStatus").className = "connection-status status-connected";
+                document.getElementById("connectionStatus").textContent = "Connected";
+                
+                const msg = {
+                    type: "connect-presenter",
+                    screenCode: screenCode,
+                    userId: userId,
+                    userName: userName
+                };
+                log("Sending: " + JSON.stringify(msg));
+                ws.send(JSON.stringify(msg));
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                log("Received: " + JSON.stringify(data));
+                
+                if (data.type === "error") {
+                    alert(data.message);
+                } else if (data.type === "presenter-connected") {
+                    log("Successfully connected to screen " + data.screenCode);
+                } else if (data.type === "display-disconnected") {
+                    alert("The display has disconnected. Please reconnect.");
+                    window.location.href = "/connect";
+                }
+            };
+
+            ws.onclose = function() {
+                log("WebSocket disconnected");
+                isConnected = false;
+                document.getElementById("connectionStatus").className = "connection-status status-disconnected";
+                document.getElementById("connectionStatus").textContent = "Disconnected";
+                setTimeout(connect, 3000);
+            };
+
+            ws.onerror = function(e) {
+                log("WebSocket error: " + JSON.stringify(e));
+            };
+        }
+
+        async function loadSlideshows() {
+            log("Loading slideshows...");
+            try {
+                const response = await fetch("/api/slideshows");
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                
+                const data = await response.json();
+                log("Loaded " + data.length + " slideshows");
+                
+                const list = document.getElementById("slideshowList");
+                if (data.length === 0) {
+                    list.innerHTML = "<p style=\"color:#666;\">No slideshows yet. <a href=\"/dashboard/create\">Create one</a></p>";
+                    return;
+                }
+                
+                list.innerHTML = "";
+                data.forEach(function(show) {
+                    const div = document.createElement("div");
+                    div.className = "slideshow-item";
+                    div.innerHTML = "<span class=\"title\">" + show.title + "</span><span class=\"count\">" + (show.slide_count || 0) + " slides</span>";
+                    div.addEventListener("click", function() {
+                        startSlideshow(show.id, show.title);
+                    });
+                    list.appendChild(div);
+                });
+            } catch (error) {
+                log("Error loading slideshows: " + error);
+                document.getElementById("slideshowList").innerHTML = "<p style=\"color:red;\">Error loading slideshows</p>";
+            }
+        }
+
+        async function startSlideshow(slideshowId, title) {
+            log("Starting slideshow: " + slideshowId + " - " + title);
+            try {
+                const response = await fetch("/api/slideshows/" + slideshowId + "/slides");
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                
+                slides = await response.json();
+                log("Loaded " + slides.length + " slides");
+                
+                if (slides.length === 0) {
+                    alert("This slideshow has no slides. Add some slides first.");
+                    return;
+                }
+                
+                currentSlideIndex = 0;
+                document.getElementById("noSlideshow").style.display = "none";
+                document.getElementById("presentationMode").style.display = "flex";
+                document.getElementById("totalNum").textContent = slides.length;
+                
+                showSlide(0);
+                
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const msg = {
+                        type: "start-slideshow",
+                        screenCode: screenCode,
+                        slideshowId: slideshowId,
+                        slide: slides[0]
+                    };
+                    log("Sending start-slideshow: " + JSON.stringify(msg));
+                    ws.send(JSON.stringify(msg));
+                } else {
+                    log("WebSocket not open! readyState: " + (ws ? ws.readyState : "null"));
+                }
+            } catch (error) {
+                log("Error starting slideshow: " + error);
+                alert("Failed to load slides: " + error.message);
+            }
+        }
+
+        function showSlide(index) {
+            if (index < 0 || index >= slides.length) {
+                log("Invalid slide index: " + index);
+                return;
+            }
+            
+            currentSlideIndex = index;
+            const slide = slides[index];
+            
+            log("Showing slide " + (index + 1) + "/" + slides.length);
+            
+            document.getElementById("currentNum").textContent = index + 1;
+            
+            const img = document.getElementById("slideImage");
+            const text = document.getElementById("slideText");
+            
+            if (slide.image_url) {
+                img.src = slide.image_url;
+                img.style.display = "block";
+                text.style.display = "none";
+            } else {
+                text.textContent = "Slide " + (index + 1);
+                text.style.display = "block";
+                img.style.display = "none";
+            }
+            
+            const notes = document.getElementById("notesContent");
+            if (slide.notes) {
+                notes.textContent = slide.notes;
+                notes.className = "notes-content";
+            } else {
+                notes.textContent = "No notes for this slide";
+                notes.className = "notes-content empty";
+            }
+            
+            document.getElementById("prevBtn").disabled = index === 0;
+            document.getElementById("nextBtn").disabled = index === slides.length - 1;
+        }
+
+        function goToPrevSlide() {
+            log("Prev button clicked. Current index: " + currentSlideIndex);
+            if (currentSlideIndex > 0) {
+                const newIndex = currentSlideIndex - 1;
+                showSlide(newIndex);
+                sendSlideChange(newIndex);
+            }
+        }
+
+        function goToNextSlide() {
+            log("Next button clicked. Current index: " + currentSlideIndex);
+            if (currentSlideIndex < slides.length - 1) {
+                const newIndex = currentSlideIndex + 1;
+                showSlide(newIndex);
+                sendSlideChange(newIndex);
+            }
+        }
+
+        function sendSlideChange(index) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const msg = {
+                    type: "change-slide",
+                    screenCode: screenCode,
+                    slideIndex: index,
+                    slide: slides[index]
+                };
+                log("Sending change-slide: " + JSON.stringify(msg));
+                ws.send(JSON.stringify(msg));
+            } else {
+                log("Cannot send - WebSocket not open");
+            }
+        }
+
+        function endPresentation() {
+            log("Ending presentation");
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "end-slideshow",
+                    screenCode: screenCode
+                }));
+            }
+            document.getElementById("noSlideshow").style.display = "flex";
+            document.getElementById("presentationMode").style.display = "none";
+            slides = [];
+            currentSlideIndex = 0;
+        }
+
+        document.getElementById("prevBtn").addEventListener("click", goToPrevSlide);
+        document.getElementById("nextBtn").addEventListener("click", goToNextSlide);
+        document.getElementById("endBtn").addEventListener("click", endPresentation);
+
+        document.addEventListener("keydown", function(e) {
+            if (document.getElementById("presentationMode").style.display !== "none") {
+                if (e.key === "ArrowRight" || e.key === " ") {
+                    e.preventDefault();
+                    goToNextSlide();
+                } else if (e.key === "ArrowLeft") {
+                    e.preventDefault();
+                    goToPrevSlide();
+                } else if (e.key === "Escape") {
+                    endPresentation();
+                }
+            }
+        });
+
+        let touchStartX = 0;
+        document.addEventListener("touchstart", function(e) {
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+
+        document.addEventListener("touchend", function(e) {
+            if (document.getElementById("presentationMode").style.display === "none") return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const diff = touchStartX - touchEndX;
+            
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) {
+                    goToNextSlide();
+                } else {
+                    goToPrevSlide();
+                }
+            }
+        }, { passive: true });
+
+        connect();
+        loadSlideshows();
+    </script>
+</body>
+</html>
