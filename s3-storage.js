@@ -13,7 +13,7 @@ const crypto = require('crypto');
 
 // S3 Configuration
 const BUCKET_NAME = 'strideshow-content';
-const REGION = process.env.AWS_REGION || 'us-east-1';
+const REGION = process.env.AWS_REGION || 'us-west-2';
 
 // Initialize S3 Client
 // Uses default AWS credential chain (environment variables, IAM role, etc.)
