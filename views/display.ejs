@@ -82,6 +82,34 @@
             padding: 40px;
         }
         
+        /* Laser pointer dot */
+        .laser-pointer {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: radial-gradient(circle, rgba(255,0,0,1) 0%, rgba(255,0,0,0.8) 30%, rgba(255,0,0,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 10001;
+            display: none;
+            box-shadow: 0 0 20px 8px rgba(255, 0, 0, 0.6), 0 0 40px 16px rgba(255, 0, 0, 0.3);
+        }
+        
+        .laser-pointer.active {
+            display: block;
+            animation: laser-pulse 0.5s ease-in-out infinite alternate;
+        }
+        
+        @keyframes laser-pulse {
+            from {
+                box-shadow: 0 0 20px 8px rgba(255, 0, 0, 0.6), 0 0 40px 16px rgba(255, 0, 0, 0.3);
+            }
+            to {
+                box-shadow: 0 0 25px 10px rgba(255, 0, 0, 0.7), 0 0 50px 20px rgba(255, 0, 0, 0.4);
+            }
+        }
+        
         /* Fullscreen hint */
         .fullscreen-hint {
             position: fixed;
@@ -211,6 +239,8 @@
     <div class="presentation-screen" id="presentationScreen">
         <img id="slideImage" src="" alt="Slide">
         <div class="slide-text hidden" id="slideText"></div>
+        <!-- Laser pointer dot -->
+        <div class="laser-pointer" id="laserPointer"></div>
     </div>
     
     <!-- Fullscreen Hint -->
@@ -288,6 +318,13 @@
                         break;
                     case "presenter-disconnected":
                         updateConnectionStatus(false);
+                        hideLaserPointer();
+                        break;
+                    case "laser-pointer":
+                        showLaserPointer(data.x, data.y);
+                        break;
+                    case "laser-pointer-off":
+                        hideLaserPointer();
                         break;
                 }
             };
@@ -499,6 +536,24 @@
         document.getElementById("presentationScreen").addEventListener("contextmenu", function(e) {
             e.preventDefault();
         });
+
+        // Laser pointer functions
+        function showLaserPointer(x, y) {
+            const laser = document.getElementById('laserPointer');
+            const presentationScreen = document.getElementById('presentationScreen');
+            
+            if (!isPresenting) return;
+            
+            // Position the laser pointer as percentage of the presentation screen
+            laser.style.left = x + '%';
+            laser.style.top = y + '%';
+            laser.classList.add('active');
+        }
+        
+        function hideLaserPointer() {
+            const laser = document.getElementById('laserPointer');
+            laser.classList.remove('active');
+        }
 
         // Initialize
         checkFullscreenPrompt();

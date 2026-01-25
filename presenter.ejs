@@ -2,363 +2,687 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Presenter Controls - StrideShow</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Presenter - StrideShow</title>
     <link rel="icon" type="image/png" href="/strideshow-icon.png">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html {
+            height: 100%;
+            height: -webkit-fill-available;
+        }
+        
         body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            height: 100vh;
+            height: 100dvh;
+            height: -webkit-fill-available;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+            touch-action: manipulation;
+            -webkit-overflow-scrolling: none;
+            overscroll-behavior: none;
         }
+        
+        /* Prevent iOS rubber-banding */
+        body, html {
+            position: fixed;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        /* Header - ultra compact */
         .header {
             background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
             color: white;
-            padding: 15px 20px;
+            padding: 8px 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
+            z-index: 100;
+            padding-top: max(8px, env(safe-area-inset-top));
         }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
         .header-logo {
-            height: 32px;
+            height: 20px;
             width: auto;
         }
-        .screen-info { font-size: 0.9rem; opacity: 0.9; }
-        .debug-btn {
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            cursor: pointer;
+        
+        .screen-badge {
+            background: rgba(255,255,255,0.25);
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
         }
-        .no-slideshow {
+        
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff4444;
+            transition: background 0.3s;
+        }
+        
+        .connection-dot.connected {
+            background: #44ff44;
+            box-shadow: 0 0 6px #44ff44;
+        }
+        
+        /* Main container */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+        
+        /* Slideshow selection */
+        .slideshow-select {
             flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 40px;
-            text-align: center;
+            padding: 20px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
-        .no-slideshow h2 { color: #333; margin-bottom: 20px; }
-        .no-slideshow p { color: #666; margin-bottom: 30px; }
-        .slideshow-list { width: 100%; max-width: 400px; }
+        
+        .slideshow-select h2 {
+            color: white;
+            font-size: 1.1rem;
+            margin-bottom: 6px;
+        }
+        
+        .slideshow-select p {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.8rem;
+            margin-bottom: 16px;
+        }
+        
+        .slideshow-list {
+            width: 100%;
+            max-width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
         .slideshow-item {
-            background: white;
-            padding: 15px 20px;
-            margin-bottom: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 12px 14px;
             border-radius: 10px;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.2s;
         }
-        .slideshow-item:hover { background: #f0fdf9; border: 1px solid #00d4aa; }
-        .slideshow-item .title { font-weight: 600; color: #333; }
-        .slideshow-item .count { color: #666; font-size: 0.9rem; }
-        .presentation-mode {
+        
+        .slideshow-item:hover, .slideshow-item:active {
+            background: rgba(0,212,170,0.2);
+            border-color: #00d4aa;
+        }
+        
+        .slideshow-item .title {
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        
+        .slideshow-item .count {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.75rem;
+        }
+        
+        /* Presentation mode */
+        .presentation-view {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+        
+        .presentation-view.active {
+            display: flex;
+        }
+        
+        /* Mode toggle */
+        .mode-toggle-bar {
+            background: #252542;
+            padding: 6px 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        
+        .mode-toggle {
+            display: flex;
+            background: #1a1a2e;
+            border-radius: 20px;
+            padding: 2px;
+        }
+        
+        .mode-btn {
+            padding: 6px 14px;
+            border: none;
+            background: transparent;
+            border-radius: 18px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .mode-btn.active {
+            background: #00d4aa;
+            color: white;
+        }
+        
+        .mode-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+        
+        /* Slide preview */
+        .slide-preview {
             flex: 1;
             display: flex;
             flex-direction: column;
-        }
-        .current-slide {
-            flex: 2;
             background: #000;
+            position: relative;
+            min-height: 0;
+            overflow: hidden;
+        }
+        
+        .slide-container {
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
-            min-height: 200px;
+            touch-action: none;
+            overflow: hidden;
         }
-        .current-slide img {
+        
+        .slide-container img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-drag: none;
         }
-        .current-slide .slide-text {
+        
+        .slide-container .slide-text {
             color: white;
-            font-size: 1.5rem;
+            font-size: 1rem;
             text-align: center;
-            padding: 20px;
+            padding: 15px;
         }
-        .slide-number {
+        
+        /* Slide number badge */
+        .slide-badge {
             position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.75);
             color: white;
-            padding: 5px 15px;
-            border-radius: 15px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
         }
-        .notes-section {
-            flex: 1;
-            background: white;
-            padding: 20px;
-            border-top: 1px solid #eee;
-            overflow-y: auto;
-            min-height: 80px;
-            max-height: 150px;
+        
+        /* Laser pointer indicator */
+        .laser-indicator {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: rgba(255, 0, 0, 0.6);
+            border: 2px solid #ff0000;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 10;
+            box-shadow: 0 0 10px rgba(255,0,0,0.8);
         }
-        .notes-section h3 { color: #00a085; font-size: 0.9rem; margin-bottom: 10px; }
-        .notes-content { color: #333; line-height: 1.6; font-size: 0.95rem; }
-        .notes-content.empty { color: #999; font-style: italic; }
-        .nav-controls {
-            background: white;
-            padding: 15px 20px;
+        
+        .laser-indicator.active {
+            display: block;
+        }
+        
+        /* Mode hint overlay */
+        .mode-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-align: center;
+            z-index: 20;
+            max-width: 80%;
+        }
+        
+        .mode-hint.visible {
+            opacity: 1;
+        }
+        
+        /* Notes section - minimal */
+        .notes-bar {
+            background: #252542;
+            flex-shrink: 0;
+            overflow: hidden;
+            transition: max-height 0.3s;
+            max-height: 36px;
+        }
+        
+        .notes-bar.expanded {
+            max-height: 100px;
+        }
+        
+        .notes-header {
+            padding: 8px 12px;
             display: flex;
-            gap: 15px;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
+        
+        .notes-header span {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .notes-toggle {
+            color: #00d4aa;
+            font-size: 0.65rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .notes-content {
+            padding: 0 12px 10px;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.75rem;
+            line-height: 1.4;
+            overflow-y: auto;
+            max-height: 60px;
+        }
+        
+        .notes-content.empty {
+            color: rgba(255,255,255,0.4);
+            font-style: italic;
+        }
+        
+        /* Navigation */
+        .nav-section {
+            background: #252542;
+            padding: 8px 12px;
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
         .nav-btn {
             flex: 1;
-            padding: 25px 20px;
-            font-size: 1.3rem;
+            padding: 14px;
+            font-size: 0.9rem;
             font-weight: 600;
             border: none;
-            border-radius: 15px;
+            border-radius: 10px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.15s;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
         }
-        .nav-btn.prev { background: #e0e0e0; color: #333; }
-        .nav-btn.prev:active { background: #ccc; }
+        
+        .nav-btn.prev {
+            background: rgba(255,255,255,0.15);
+            color: white;
+        }
+        
+        .nav-btn.prev:active {
+            background: rgba(255,255,255,0.25);
+        }
+        
         .nav-btn.next {
             background: linear-gradient(135deg, #00d4aa 0%, #00a085 100%);
             color: white;
         }
-        .nav-btn.next:active { opacity: 0.8; }
-        .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        .nav-btn.next:active {
+            opacity: 0.85;
+        }
+        
+        .nav-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+        
         .end-btn {
-            background: #f44336;
-            color: white;
-            border: none;
-            padding: 15px;
-            border-radius: 10px;
-            cursor: pointer;
-            width: calc(100% - 40px);
-            margin: 10px 20px 20px;
-            font-size: 1rem;
-            font-weight: 500;
-        }
-        .connection-status {
-            position: fixed;
-            top: 70px;
-            right: 10px;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            z-index: 100;
-        }
-        .status-connected { background: rgba(0, 212, 170, 0.2); color: #00a085; }
-        .status-disconnected { background: rgba(244, 67, 54, 0.2); color: #f44336; }
-        .debug-log {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0,0,0,0.9);
-            color: #0f0;
-            font-family: monospace;
-            font-size: 11px;
+            background: transparent;
+            border: 1px solid rgba(244, 67, 54, 0.5);
+            color: #f44336;
             padding: 10px;
-            max-height: 150px;
-            overflow-y: auto;
-            display: none;
-            z-index: 1000;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .end-btn:active {
+            background: rgba(244, 67, 54, 0.15);
+        }
+        
+        /* Swipe visual feedback */
+        .swipe-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255,255,255,0.15);
+            font-size: 2rem;
+            pointer-events: none;
+        }
+        
+        .swipe-indicator.left { left: 10px; }
+        .swipe-indicator.right { right: 10px; }
+        
+        /* Loading state */
+        .loading {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        
+        /* Error link */
+        .slideshow-list a {
+            color: #00d4aa;
+            text-decoration: none;
+        }
+        
+        /* Hide elements utility */
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
+    <!-- Header -->
     <div class="header">
-        <div>
+        <div class="header-left">
             <img src="/strideshow-logo.png" alt="StrideShow" class="header-logo">
-            <div class="screen-info">Screen: <span id="screenCode"><%= screenCode %></span></div>
+            <span class="screen-badge"><%= screenCode %></span>
         </div>
-        <button class="debug-btn" onclick="toggleDebug()">Debug</button>
-    </div>
-    <div class="connection-status status-disconnected" id="connectionStatus">Connecting...</div>
-
-    <div class="no-slideshow" id="noSlideshow">
-        <h2>Select a Slideshow</h2>
-        <p>Choose a presentation to display on the connected screen</p>
-        <div class="slideshow-list" id="slideshowList">Loading...</div>
+        <div class="connection-dot" id="connectionDot" title="Connection status"></div>
     </div>
 
-    <div class="presentation-mode" id="presentationMode" style="display: none;">
-        <div class="current-slide">
-            <img id="slideImage" src="" alt="Slide" style="display: none;">
-            <div class="slide-text" id="slideText"></div>
-            <div class="slide-number"><span id="currentNum">1</span> / <span id="totalNum">1</span></div>
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Slideshow Selection -->
+        <div class="slideshow-select" id="slideshowSelect">
+            <h2>Select Presentation</h2>
+            <p>Choose a slideshow to present</p>
+            <div class="slideshow-list" id="slideshowList">
+                <div class="loading">Loading slideshows...</div>
+            </div>
         </div>
-        <div class="notes-section">
-            <h3>Speaker Notes</h3>
-            <div class="notes-content" id="notesContent">No notes</div>
-        </div>
-        <div class="nav-controls">
-            <button class="nav-btn prev" id="prevBtn">← Prev</button>
-            <button class="nav-btn next" id="nextBtn">Next →</button>
-        </div>
-        <button class="end-btn" id="endBtn">End Presentation</button>
-    </div>
 
-    <div class="debug-log" id="debugLog"></div>
+        <!-- Presentation View -->
+        <div class="presentation-view" id="presentationView">
+            <!-- Mode Toggle -->
+            <div class="mode-toggle-bar">
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="swipeModeBtn" onclick="setMode('swipe')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M7 16l-4-4 4-4"/>
+                            <path d="M17 8l4 4-4 4"/>
+                        </svg>
+                        Swipe
+                    </button>
+                    <button class="mode-btn" id="laserModeBtn" onclick="setMode('laser')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="3"/>
+                            <circle cx="12" cy="12" r="7" stroke-dasharray="4 4"/>
+                        </svg>
+                        Laser
+                    </button>
+                </div>
+            </div>
+
+            <!-- Slide Preview -->
+            <div class="slide-preview">
+                <div class="slide-container" id="slideContainer">
+                    <img id="slideImage" src="" alt="Slide">
+                    <div class="slide-text hidden" id="slideText"></div>
+                    <div class="slide-badge"><span id="currentNum">1</span> / <span id="totalNum">1</span></div>
+                    <div class="laser-indicator" id="laserIndicator"></div>
+                    <div class="mode-hint" id="modeHint"></div>
+                    <span class="swipe-indicator left">‹</span>
+                    <span class="swipe-indicator right">›</span>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="notes-bar" id="notesBar">
+                <div class="notes-header" onclick="toggleNotes()">
+                    <span>Notes</span>
+                    <button class="notes-toggle" id="notesToggle">▼</button>
+                </div>
+                <div class="notes-content empty" id="notesContent">No notes for this slide</div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="nav-section">
+                <div class="nav-buttons">
+                    <button class="nav-btn prev" id="prevBtn" onclick="goToPrevSlide()">← Prev</button>
+                    <button class="nav-btn next" id="nextBtn" onclick="goToNextSlide()">Next →</button>
+                </div>
+                <button class="end-btn" id="endBtn" onclick="endPresentation()">End Presentation</button>
+            </div>
+        </div>
+    </div>
 
     <script>
+        // Config from server
         const screenCode = "<%= screenCode %>";
         const userId = "<%= user.id %>";
         const userName = "<%= user.name || user.email %>";
         
+        // State
         let ws = null;
         let slides = [];
         let currentSlideIndex = 0;
         let isConnected = false;
+        let currentMode = 'swipe'; // 'swipe' or 'laser'
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let notesExpanded = false;
+        let reconnectTimer = null;
 
-        function log(msg) {
-            console.log("[Presenter]", msg);
-            const debugLog = document.getElementById("debugLog");
-            const time = new Date().toLocaleTimeString();
-            debugLog.innerHTML += time + ": " + msg + "<br>";
-            debugLog.scrollTop = debugLog.scrollHeight;
-        }
-
-        function toggleDebug() {
-            const d = document.getElementById("debugLog");
-            d.style.display = d.style.display === "none" ? "block" : "none";
-        }
-
+        // Connect WebSocket
         function connect() {
-            log("Connecting to WebSocket...");
+            if (ws && ws.readyState === WebSocket.OPEN) return;
+            
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             ws = new WebSocket(protocol + "//" + window.location.host + "/ws");
 
             ws.onopen = function() {
-                log("WebSocket connected!");
+                console.log("[WS] Connected");
                 isConnected = true;
-                document.getElementById("connectionStatus").className = "connection-status status-connected";
-                document.getElementById("connectionStatus").textContent = "Connected";
+                document.getElementById("connectionDot").classList.add("connected");
                 
-                const msg = {
+                ws.send(JSON.stringify({
                     type: "connect-presenter",
                     screenCode: screenCode,
                     userId: userId,
                     userName: userName
-                };
-                log("Sending: " + JSON.stringify(msg));
-                ws.send(JSON.stringify(msg));
+                }));
             };
 
             ws.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                log("Received: " + JSON.stringify(data));
+                console.log("[WS] Received:", data.type);
                 
                 if (data.type === "error") {
                     alert(data.message);
-                } else if (data.type === "presenter-connected") {
-                    log("Successfully connected to screen " + data.screenCode);
                 } else if (data.type === "display-disconnected") {
-                    alert("The display has disconnected. Please reconnect.");
+                    alert("Display disconnected. Returning to connect page.");
                     window.location.href = "/connect";
                 }
             };
 
             ws.onclose = function() {
-                log("WebSocket disconnected");
+                console.log("[WS] Disconnected");
                 isConnected = false;
-                document.getElementById("connectionStatus").className = "connection-status status-disconnected";
-                document.getElementById("connectionStatus").textContent = "Disconnected";
-                setTimeout(connect, 3000);
+                document.getElementById("connectionDot").classList.remove("connected");
+                reconnectTimer = setTimeout(connect, 3000);
             };
 
             ws.onerror = function(e) {
-                log("WebSocket error: " + JSON.stringify(e));
+                console.error("[WS] Error:", e);
             };
         }
 
+        // Mode switching
+        function setMode(mode) {
+            currentMode = mode;
+            
+            document.getElementById("swipeModeBtn").classList.toggle("active", mode === 'swipe');
+            document.getElementById("laserModeBtn").classList.toggle("active", mode === 'laser');
+            
+            const hint = document.getElementById("modeHint");
+            hint.innerHTML = mode === 'swipe' 
+                ? "Swipe left/right to change slides" 
+                : "Touch to point • Use buttons to navigate";
+            hint.classList.add("visible");
+            setTimeout(() => hint.classList.remove("visible"), 1500);
+        }
+
+        // Notes toggle
+        function toggleNotes() {
+            notesExpanded = !notesExpanded;
+            document.getElementById("notesBar").classList.toggle("expanded", notesExpanded);
+            document.getElementById("notesToggle").textContent = notesExpanded ? "▲" : "▼";
+        }
+
+        // Load slideshows
         async function loadSlideshows() {
-            log("Loading slideshows...");
             try {
                 const response = await fetch("/api/slideshows");
-                if (!response.ok) throw new Error("HTTP " + response.status);
+                if (!response.ok) throw new Error("Failed to load");
                 
                 const data = await response.json();
-                log("Loaded " + data.length + " slideshows");
-                
                 const list = document.getElementById("slideshowList");
+                
                 if (data.length === 0) {
-                    list.innerHTML = "<p style=\"color:#666;\">No slideshows yet. <a href=\"/dashboard/create\">Create one</a></p>";
+                    list.innerHTML = '<div class="loading">No slideshows yet. <a href="/dashboard">Create one</a></div>';
                     return;
                 }
                 
                 list.innerHTML = "";
-                data.forEach(function(show) {
+                data.forEach(show => {
                     const div = document.createElement("div");
                     div.className = "slideshow-item";
-                    div.innerHTML = "<span class=\"title\">" + show.title + "</span><span class=\"count\">" + (show.slide_count || 0) + " slides</span>";
-                    div.addEventListener("click", function() {
-                        startSlideshow(show.id, show.title);
-                    });
+                    div.innerHTML = `
+                        <span class="title">${show.title}</span>
+                        <span class="count">${show.slide_count || 0} slides</span>
+                    `;
+                    div.addEventListener("click", () => startSlideshow(show.id, show.title));
                     list.appendChild(div);
                 });
             } catch (error) {
-                log("Error loading slideshows: " + error);
-                document.getElementById("slideshowList").innerHTML = "<p style=\"color:red;\">Error loading slideshows</p>";
+                console.error("Error loading slideshows:", error);
+                document.getElementById("slideshowList").innerHTML = 
+                    '<div class="loading" style="color:#f44336;">Failed to load slideshows</div>';
             }
         }
 
+        // Start slideshow
         async function startSlideshow(slideshowId, title) {
-            log("Starting slideshow: " + slideshowId + " - " + title);
             try {
                 const response = await fetch("/api/slideshows/" + slideshowId + "/slides");
-                if (!response.ok) throw new Error("HTTP " + response.status);
+                if (!response.ok) throw new Error("Failed to load slides");
                 
                 slides = await response.json();
-                log("Loaded " + slides.length + " slides");
                 
                 if (slides.length === 0) {
-                    alert("This slideshow has no slides. Add some slides first.");
+                    alert("This slideshow has no slides yet.");
                     return;
                 }
                 
                 currentSlideIndex = 0;
-                document.getElementById("noSlideshow").style.display = "none";
-                document.getElementById("presentationMode").style.display = "flex";
+                document.getElementById("slideshowSelect").classList.add("hidden");
+                document.getElementById("presentationView").classList.add("active");
                 document.getElementById("totalNum").textContent = slides.length;
                 
                 showSlide(0);
+                setMode('swipe');
                 
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    const msg = {
+                    ws.send(JSON.stringify({
                         type: "start-slideshow",
                         screenCode: screenCode,
                         slideshowId: slideshowId,
                         slide: slides[0]
-                    };
-                    log("Sending start-slideshow: " + JSON.stringify(msg));
-                    ws.send(JSON.stringify(msg));
-                } else {
-                    log("WebSocket not open! readyState: " + (ws ? ws.readyState : "null"));
+                    }));
                 }
             } catch (error) {
-                log("Error starting slideshow: " + error);
-                alert("Failed to load slides: " + error.message);
+                console.error("Error starting slideshow:", error);
+                alert("Failed to start slideshow");
             }
         }
 
+        // Show slide
         function showSlide(index) {
-            if (index < 0 || index >= slides.length) {
-                log("Invalid slide index: " + index);
-                return;
-            }
+            if (index < 0 || index >= slides.length) return;
             
             currentSlideIndex = index;
             const slide = slides[index];
-            
-            log("Showing slide " + (index + 1) + "/" + slides.length);
             
             document.getElementById("currentNum").textContent = index + 1;
             
@@ -367,29 +691,29 @@
             
             if (slide.image_url) {
                 img.src = slide.image_url;
-                img.style.display = "block";
-                text.style.display = "none";
+                img.classList.remove("hidden");
+                text.classList.add("hidden");
             } else {
                 text.textContent = "Slide " + (index + 1);
-                text.style.display = "block";
-                img.style.display = "none";
+                text.classList.remove("hidden");
+                img.classList.add("hidden");
             }
             
             const notes = document.getElementById("notesContent");
             if (slide.notes) {
                 notes.textContent = slide.notes;
-                notes.className = "notes-content";
+                notes.classList.remove("empty");
             } else {
                 notes.textContent = "No notes for this slide";
-                notes.className = "notes-content empty";
+                notes.classList.add("empty");
             }
             
             document.getElementById("prevBtn").disabled = index === 0;
             document.getElementById("nextBtn").disabled = index === slides.length - 1;
         }
 
+        // Navigation
         function goToPrevSlide() {
-            log("Prev button clicked. Current index: " + currentSlideIndex);
             if (currentSlideIndex > 0) {
                 const newIndex = currentSlideIndex - 1;
                 showSlide(newIndex);
@@ -398,7 +722,6 @@
         }
 
         function goToNextSlide() {
-            log("Next button clicked. Current index: " + currentSlideIndex);
             if (currentSlideIndex < slides.length - 1) {
                 const newIndex = currentSlideIndex + 1;
                 showSlide(newIndex);
@@ -408,71 +731,173 @@
 
         function sendSlideChange(index) {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                const msg = {
+                ws.send(JSON.stringify({
                     type: "change-slide",
                     screenCode: screenCode,
                     slideIndex: index,
                     slide: slides[index]
-                };
-                log("Sending change-slide: " + JSON.stringify(msg));
-                ws.send(JSON.stringify(msg));
-            } else {
-                log("Cannot send - WebSocket not open");
+                }));
             }
         }
 
+        // Laser pointer
+        function sendLaserPosition(x, y) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "laser-pointer",
+                    screenCode: screenCode,
+                    x: x,
+                    y: y
+                }));
+            }
+        }
+
+        function sendLaserOff() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "laser-pointer-off",
+                    screenCode: screenCode
+                }));
+            }
+        }
+
+        // End presentation
         function endPresentation() {
-            log("Ending presentation");
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: "end-slideshow",
                     screenCode: screenCode
                 }));
             }
-            document.getElementById("noSlideshow").style.display = "flex";
-            document.getElementById("presentationMode").style.display = "none";
+            
+            document.getElementById("slideshowSelect").classList.remove("hidden");
+            document.getElementById("presentationView").classList.remove("active");
             slides = [];
             currentSlideIndex = 0;
         }
 
-        document.getElementById("prevBtn").addEventListener("click", goToPrevSlide);
-        document.getElementById("nextBtn").addEventListener("click", goToNextSlide);
-        document.getElementById("endBtn").addEventListener("click", endPresentation);
+        // Touch handling
+        const slideContainer = document.getElementById("slideContainer");
+        const laserIndicator = document.getElementById("laserIndicator");
 
-        document.addEventListener("keydown", function(e) {
-            if (document.getElementById("presentationMode").style.display !== "none") {
-                if (e.key === "ArrowRight" || e.key === " ") {
-                    e.preventDefault();
-                    goToNextSlide();
-                } else if (e.key === "ArrowLeft") {
-                    e.preventDefault();
-                    goToPrevSlide();
-                } else if (e.key === "Escape") {
-                    endPresentation();
+        slideContainer.addEventListener("touchstart", function(e) {
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            
+            if (currentMode === 'laser') {
+                e.preventDefault();
+                handleLaserTouch(touch);
+                laserIndicator.classList.add("active");
+            }
+        }, { passive: false });
+
+        slideContainer.addEventListener("touchmove", function(e) {
+            if (currentMode === 'laser') {
+                e.preventDefault();
+                handleLaserTouch(e.touches[0]);
+            }
+        }, { passive: false });
+
+        slideContainer.addEventListener("touchend", function(e) {
+            if (currentMode === 'swipe') {
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const diffX = touchStartX - touchEndX;
+                const diffY = Math.abs(touchStartY - touchEndY);
+                
+                if (Math.abs(diffX) > 50 && Math.abs(diffX) > diffY) {
+                    if (diffX > 0) {
+                        goToNextSlide();
+                    } else {
+                        goToPrevSlide();
+                    }
                 }
+            } else if (currentMode === 'laser') {
+                laserIndicator.classList.remove("active");
+                sendLaserOff();
+            }
+        }, { passive: true });
+
+        function handleLaserTouch(touch) {
+            const rect = slideContainer.getBoundingClientRect();
+            const x = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100));
+            const y = Math.max(0, Math.min(100, ((touch.clientY - rect.top) / rect.height) * 100));
+            
+            laserIndicator.style.left = x + "%";
+            laserIndicator.style.top = y + "%";
+            
+            sendLaserPosition(x, y);
+        }
+
+        // Mouse support (desktop testing)
+        let isMouseDown = false;
+
+        slideContainer.addEventListener("mousedown", function(e) {
+            if (currentMode === 'laser') {
+                isMouseDown = true;
+                handleLaserMouse(e);
+                laserIndicator.classList.add("active");
             }
         });
 
-        let touchStartX = 0;
-        document.addEventListener("touchstart", function(e) {
-            touchStartX = e.touches[0].clientX;
-        }, { passive: true });
-
-        document.addEventListener("touchend", function(e) {
-            if (document.getElementById("presentationMode").style.display === "none") return;
-            
-            const touchEndX = e.changedTouches[0].clientX;
-            const diff = touchStartX - touchEndX;
-            
-            if (Math.abs(diff) > 50) {
-                if (diff > 0) {
-                    goToNextSlide();
-                } else {
-                    goToPrevSlide();
-                }
+        slideContainer.addEventListener("mousemove", function(e) {
+            if (currentMode === 'laser' && isMouseDown) {
+                handleLaserMouse(e);
             }
-        }, { passive: true });
+        });
 
+        slideContainer.addEventListener("mouseup", function() {
+            if (currentMode === 'laser') {
+                isMouseDown = false;
+                laserIndicator.classList.remove("active");
+                sendLaserOff();
+            }
+        });
+
+        slideContainer.addEventListener("mouseleave", function() {
+            if (currentMode === 'laser' && isMouseDown) {
+                isMouseDown = false;
+                laserIndicator.classList.remove("active");
+                sendLaserOff();
+            }
+        });
+
+        function handleLaserMouse(e) {
+            const rect = slideContainer.getBoundingClientRect();
+            const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+            const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+            
+            laserIndicator.style.left = x + "%";
+            laserIndicator.style.top = y + "%";
+            
+            sendLaserPosition(x, y);
+        }
+
+        // Keyboard support
+        document.addEventListener("keydown", function(e) {
+            if (!document.getElementById("presentationView").classList.contains("active")) return;
+            
+            if (e.key === "ArrowRight" || e.key === " ") {
+                e.preventDefault();
+                goToNextSlide();
+            } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                goToPrevSlide();
+            } else if (e.key === "Escape") {
+                endPresentation();
+            }
+        });
+
+        // Prevent pull-to-refresh and bounce
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.closest('.slideshow-select') || e.target.closest('.notes-content')) {
+                return; // Allow scrolling in these areas
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        // Initialize
         connect();
         loadSlideshows();
     </script>
