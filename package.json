@@ -1,9 +1,41 @@
 {
+  "name": "ripslide",
+  "version": "1.0.0",
+  "description": "The easiest presentation tool",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "presentation",
+    "slides",
+    "websocket"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-ec2": "^3.969.0",
-    "@aws-sdk/client-iam": "^3.969.0",
     "@aws-sdk/client-s3": "^3.969.0",
-    "@aws-sdk/client-sts": "^3.969.0",
-    "@aws-sdk/s3-request-presigner": "^3.969.0"
+    "@aws-sdk/s3-request-presigner": "^3.969.0",
+    "bcryptjs": "^2.4.3",
+    "connect-pg-simple": "^10.0.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "express-validator": "^7.0.1",
+    "googleapis": "^170.0.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "pg": "^8.11.3",
+    "pg-pool": "^3.6.1",
+    "qrcode": "^1.5.3",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
   }
 }

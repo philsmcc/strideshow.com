@@ -1,0 +1,70 @@
+<%- include("partials/header", { title: "Join Presentation" }) %>
+
+<div class="go-container">
+    <div style="text-align: center;">
+        <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">RipSlide</h1>
+        <p style="opacity: 0.7; margin-bottom: 2rem;">Enter a 6-digit code to join a presentation</p>
+        
+        <% if (typeof error !== 'undefined' && error) { %>
+        <div style="background: var(--danger); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+            <%- error %>
+        </div>
+        <% } %>
+        
+        <div class="code-input-section">
+            <input type="text" 
+                   id="codeInput" 
+                   class="code-input" 
+                   maxlength="6" 
+                   placeholder="ABC123"
+                   autocomplete="off"
+                   autofocus>
+            <br><br>
+            <button onclick="joinPresentation()" class="btn btn-primary btn-large">Join</button>
+        </div>
+        
+        <p style="margin-top: 3rem; opacity: 0.5;">
+            Ask the presenter for the code or scan their QR code
+        </p>
+    </div>
+</div>
+
+<script>
+const input = document.getElementById("codeInput");
+
+input.addEventListener("input", (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (e.target.value.length === 6) {
+        joinPresentation();
+    }
+});
+
+input.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+        joinPresentation();
+    }
+});
+
+async function joinPresentation() {
+    const code = input.value.trim().toUpperCase();
+    if (code.length !== 6) {
+        alert("Please enter a 6-character code");
+        return;
+    }
+    
+    try {
+        const res = await fetch("/api/sessions/validate/" + code);
+        const data = await res.json();
+        
+        if (data.valid) {
+            window.location.href = "/go/" + code;
+        } else {
+            alert(data.error || "Invalid code");
+        }
+    } catch (err) {
+        alert("Failed to validate code");
+    }
+}
+</script>
+
+<%- include("partials/footer") %>

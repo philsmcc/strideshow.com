@@ -1,0 +1,96 @@
+<%- include("partials/header", { title: title }) %>
+
+<div class="screen-container" id="screenContainer">
+    <div class="waiting-screen" id="waitingScreen">
+        <h2><%- title %></h2>
+        <div class="waiting-spinner"></div>
+        <p>Waiting for presenter...</p>
+    </div>
+    
+    <img id="slideDisplay" class="slide-display" style="display: none;" alt="Current Slide">
+</div>
+
+<script>
+const sessionCode = "<%- sessionCode %>";
+const screenId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+let ws;
+let slides = [];
+let currentSlideIndex = 0;
+
+function connect() {
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(wsProtocol + "//" + window.location.host + "/ws");
+    
+    ws.onopen = () => {
+        console.log("WebSocket connected");
+        ws.send(JSON.stringify({
+            type: "join-screen",
+            sessionCode: sessionCode,
+            screenId: screenId
+        }));
+    };
+    
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleMessage(data);
+    };
+    
+    ws.onclose = () => {
+        console.log("WebSocket disconnected, reconnecting...");
+        setTimeout(connect, 2000);
+    };
+    
+    ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+    };
+}
+
+function handleMessage(data) {
+    switch (data.type) {
+        case "session-joined":
+            slides = data.slides;
+            currentSlideIndex = data.currentSlide || 0;
+            showSlide(currentSlideIndex);
+            break;
+            
+        case "slide-changed":
+            currentSlideIndex = data.slideIndex;
+            showSlide(currentSlideIndex);
+            break;
+            
+        case "error":
+            alert(data.message);
+            break;
+    }
+}
+
+function showSlide(index) {
+    const waitingScreen = document.getElementById("waitingScreen");
+    const slideDisplay = document.getElementById("slideDisplay");
+    
+    if (slides.length === 0 || !slides[index]) {
+        waitingScreen.style.display = "block";
+        slideDisplay.style.display = "none";
+        return;
+    }
+    
+    waitingScreen.style.display = "none";
+    slideDisplay.style.display = "block";
+    slideDisplay.src = slides[index].content_url || slides[index].thumbnail_url || "";
+}
+
+// Start connection
+connect();
+
+// Fullscreen on click
+document.getElementById("screenContainer").addEventListener("click", () => {
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    } else {
+        document.documentElement.requestFullscreen();
+    }
+});
+</script>
+
+<%- include("partials/footer") %>

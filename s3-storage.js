@@ -189,13 +189,22 @@ function isLocalUpload(url) {
 function getContentType(filename) {
     const ext = path.extname(filename).toLowerCase();
     const mimeTypes = {
+        // Images
         '.png': 'image/png',
         '.jpg': 'image/jpeg',
         '.jpeg': 'image/jpeg',
         '.gif': 'image/gif',
         '.webp': 'image/webp',
-        '.pdf': 'application/pdf',
         '.svg': 'image/svg+xml',
+        // Videos
+        '.mp4': 'video/mp4',
+        '.webm': 'video/webm',
+        '.mov': 'video/quicktime',
+        '.avi': 'video/x-msvideo',
+        '.mkv': 'video/x-matroska',
+        '.m4v': 'video/x-m4v',
+        // Documents
+        '.pdf': 'application/pdf',
     };
     return mimeTypes[ext] || 'application/octet-stream';
 }
