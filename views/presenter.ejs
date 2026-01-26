@@ -205,25 +205,44 @@
             height: 14px;
         }
         
-        /* Slide preview */
+        /* Slide preview - fixed 16:9 aspect ratio */
         .slide-preview {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: #000;
-            position: relative;
-            min-height: 0;
-            overflow: hidden;
-        }
-        
-        .slide-container {
-            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
+            background: #000;
             position: relative;
-            touch-action: none;
+            flex-shrink: 0;
+            padding: 8px;
+        }
+        
+        .slide-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            max-height: 40vh;
+            background: #111;
+            border-radius: 4px;
             overflow: hidden;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Fallback for browsers without aspect-ratio support */
+        @supports not (aspect-ratio: 16 / 9) {
+            .slide-container {
+                height: 0;
+                padding-bottom: 56.25%; /* 9/16 = 0.5625 */
+            }
+            .slide-container > * {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
         }
         
         .slide-container img {
@@ -245,14 +264,14 @@
         /* Slide number badge */
         .slide-badge {
             position: absolute;
-            bottom: 8px;
+            bottom: 6px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0,0,0,0.75);
             color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.65rem;
             font-weight: 500;
         }
         
@@ -298,17 +317,14 @@
             opacity: 1;
         }
         
-        /* Notes section - minimal */
-        .notes-bar {
+        /* Notes section - expanded by default now */
+        .notes-section {
             background: #252542;
-            flex-shrink: 0;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
-            transition: max-height 0.3s;
-            max-height: 36px;
-        }
-        
-        .notes-bar.expanded {
-            max-height: 100px;
         }
         
         .notes-header {
@@ -316,33 +332,26 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
+            flex-shrink: 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         
         .notes-header span {
-            color: rgba(255,255,255,0.6);
-            font-size: 0.65rem;
+            color: rgba(255,255,255,0.7);
+            font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         
-        .notes-toggle {
-            color: #00d4aa;
-            font-size: 0.65rem;
-            background: none;
-            border: none;
-            cursor: pointer;
-        }
-        
         .notes-content {
-            padding: 0 12px 10px;
-            color: rgba(255,255,255,0.8);
-            font-size: 0.75rem;
-            line-height: 1.4;
+            flex: 1;
+            padding: 10px 12px;
+            color: rgba(255,255,255,0.9);
+            font-size: 0.85rem;
+            line-height: 1.5;
             overflow-y: auto;
-            max-height: 60px;
+            -webkit-overflow-scrolling: touch;
         }
         
         .notes-content.empty {
@@ -508,10 +517,9 @@
             </div>
 
             <!-- Notes -->
-            <div class="notes-bar" id="notesBar">
-                <div class="notes-header" onclick="toggleNotes()">
-                    <span>Notes</span>
-                    <button class="notes-toggle" id="notesToggle">▼</button>
+            <div class="notes-section" id="notesSection">
+                <div class="notes-header">
+                    <span>Speaker Notes</span>
                 </div>
                 <div class="notes-content empty" id="notesContent">No notes for this slide</div>
             </div>
@@ -541,7 +549,6 @@
         let currentMode = 'swipe'; // 'swipe' or 'laser'
         let touchStartX = 0;
         let touchStartY = 0;
-        let notesExpanded = false;
         let reconnectTimer = null;
 
         // Connect WebSocket
@@ -601,13 +608,6 @@
                 : "Touch to point • Use buttons to navigate";
             hint.classList.add("visible");
             setTimeout(() => hint.classList.remove("visible"), 1500);
-        }
-
-        // Notes toggle
-        function toggleNotes() {
-            notesExpanded = !notesExpanded;
-            document.getElementById("notesBar").classList.toggle("expanded", notesExpanded);
-            document.getElementById("notesToggle").textContent = notesExpanded ? "▲" : "▼";
         }
 
         // Load slideshows
@@ -891,7 +891,7 @@
 
         // Prevent pull-to-refresh and bounce
         document.addEventListener('touchmove', function(e) {
-            if (e.target.closest('.slideshow-select') || e.target.closest('.notes-content')) {
+            if (e.target.closest('.slideshow-select') || e.target.closest('.notes-section')) {
                 return; // Allow scrolling in these areas
             }
             e.preventDefault();
