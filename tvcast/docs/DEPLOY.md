@@ -36,6 +36,11 @@ pm2 logs panelcast --nostream --lines 20
 
 ## 2. nginx
 
+> **Status: applied.** These blocks are live on this server as of the initial
+> deploy. A snapshot of the deployed file is kept at
+> `tvcast/deploy/strideshow.conf.deployed`, and a timestamped backup of the
+> pre-change config is at `/etc/nginx/conf.d/strideshow.conf.bak-*`.
+
 Add these two blocks to the **existing** `www.strideshow.com` server block in
 `/etc/nginx/conf.d/strideshow.conf`, *above* the current `location / {}`.
 
