@@ -52,6 +52,15 @@ class RtcReceiver(
     private var remoteVideoTrack: VideoTrack? = null
     private var firstFrameSeen = false
     private var iceServers: List<PeerConnection.IceServer> = emptyList()
+    /**
+     * Whether this device reports an H.264 decoder. Drives codec preference:
+     * there is no software H.264 in this build, so preferring it on a device
+     * without hardware support guarantees a black screen.
+     */
+    private var hasH264Decoder = false
+    /** Human-readable decoder list, shown on the lobby for diagnosis. */
+    var decoderSummary: String = "?"
+        private set
 
     fun initFactory() {
         if (factory != null) return
@@ -84,6 +93,26 @@ class RtcReceiver(
             .createAudioDeviceModule()
         adm.setSpeakerMute(true)
         adm.setMicrophoneMute(true)
+
+        // Log the decoders this device really has. Forcing H.264 without
+        // checking this was the core mistake: this WebRTC build ships NO
+        // software H.264 (only libvpx VP8/VP9), so if MediaCodec H.264 fails
+        // to initialise there is no fallback and every frame is dropped.
+        try {
+            val codecs = decoderFactory.supportedCodecs
+            Log.i(TAG, "device decoders: " + codecs.joinToString(", ") { c ->
+                "${c.name}${if (c.params.isNotEmpty()) c.params else ""}"
+            })
+            decoderSummary = codecs.map { it.name }.distinct().joinToString("/")
+            hasH264Decoder = codecs.any { it.name.equals("H264", ignoreCase = true) }
+            if (!hasH264Decoder) {
+                Log.w(TAG, "NO H.264 decoder on this device - will negotiate VP8 instead")
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "could not enumerate decoders: ${t.message}")
+            decoderSummary = "enumeration failed"
+            hasH264Decoder = false
+        }
 
         factory = PeerConnectionFactory.builder()
             .setVideoDecoderFactory(decoderFactory)
@@ -193,7 +222,15 @@ class RtcReceiver(
             override fun onCreateSuccess(desc: SessionDescription) {
                 // Reorder codecs so our hardware-friendly H.264 comes first;
                 // the sender already prefers it, this makes it mutual.
-                val tuned = SdpUtils.preferH264(desc.description)
+                // Prefer H.264 only if this device has a decoder for it;
+                // otherwise leave WebRTC's own ordering (VP8 first), which is
+                // always software-decodable.
+                val tuned = if (hasH264Decoder) {
+                    SdpUtils.preferH264(desc.description)
+                } else {
+                    Log.i(TAG, "no H.264 decoder - leaving codec order as negotiated")
+                    desc.description
+                }
                 logCodecs("answer", tuned)
                 val finalDesc = SessionDescription(desc.type, tuned)
 

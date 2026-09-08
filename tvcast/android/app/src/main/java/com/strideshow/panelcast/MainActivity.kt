@@ -122,6 +122,13 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
             override fun run() {
                 rtc?.pollStats { st ->
                     main.post {
+                        // Reveal the video as soon as frames are genuinely
+                        // being decoded. This replaces onFirstFrameRendered as
+                        // the trigger: that callback only fires once per
+                        // renderer lifetime (the flag is reset only in init),
+                        // so on a reconnect it never fired and the lobby stuck.
+                        if (!isLive && st.framesDecoded > 0) showLive()
+
                         val line = getString(
                             R.string.diag_stats,
                             st.width, st.height,
@@ -159,7 +166,6 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
             // was painted". Verified against the 125.6422.07 bytecode. Use it
             // only as a progress signal.
             Log.i(TAG, "frame reached renderer")
-            main.post { if (!isLive) showLive() }
         }
 
         override fun onFrameResolutionChanged(width: Int, height: Int, rotation: Int) {
@@ -223,6 +229,14 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
 
         val host = hostFromUrl(joinUrl)
         binding.txtJoinHint.text = getString(R.string.join_hint, host)
+
+        // Always show the decoder list on the lobby: it is the single most
+        // useful fact when video fails, and costs one small line of text.
+        rtc?.let { r ->
+            r.initFactory()
+            binding.txtDiag.visibility = View.VISIBLE
+            binding.txtDiag.text = getString(R.string.diag_decoders, r.decoderSummary)
+        }
         Log.i(TAG, "hosting room $room")
     }
 

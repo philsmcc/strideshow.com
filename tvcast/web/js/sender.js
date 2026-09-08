@@ -6,7 +6,7 @@
  * Android side simpler (no renegotiation dance on a weak CPU).
  */
 
-import { tuneOffer } from './sdp.js';
+import { setVideoBitrate } from './sdp.js';
 
 /**
  * Derive the mount prefix from our own URL. The pages live at
@@ -157,7 +157,12 @@ export class Sender {
       offerToReceiveAudio: false,
       offerToReceiveVideo: false,
     });
-    offer.sdp = tuneOffer(offer.sdp, this.bitrateKbps);
+    // Only raise the bitrate ceiling here. We deliberately do NOT reorder
+    // codecs in the offer: the receiver knows which decoders it actually has,
+    // and its answer selects the codec. Forcing H.264 from the sender broke
+    // panels whose MediaCodec H.264 was unavailable, because this WebRTC
+    // build has no software H.264 fallback.
+    offer.sdp = setVideoBitrate(offer.sdp, this.bitrateKbps);
     await this.pc.setLocalDescription(offer);
 
     this._send({ type: 'offer', sdp: this.pc.localDescription.sdp });
