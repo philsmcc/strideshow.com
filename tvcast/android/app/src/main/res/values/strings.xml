@@ -28,6 +28,10 @@
     <string name="diag_net">IP %1$s · %2$s · API %3$d</string>
     <string name="diag_ice">ICE: %1$s</string>
     <string name="diag_video">Video %1$d×%2$d rot %3$d</string>
+    <!-- Live receive diagnostics: dec=frames decoded, drop=dropped,
+         paint=frames actually drawn by GL. paint==0 with dec>0 means the
+         decoder works but the surface is not rendering. -->
+    <string name="diag_stats">%1$d×%2$d · dec %3$d · drop %4$d · paint %5$d · %6$dKB · %7$s · %8$s</string>
 
     <!-- Settings -->
     <string name="settings_title">PanelCast Settings</string>
@@ -39,4 +43,5 @@
     <string name="settings_back">Back</string>
     <string name="settings_saved">Saved</string>
     <string name="settings_reset_done">Reset to default server</string>
+    <string name="err_gl_oom">Graphics memory exhausted — try a lower quality setting on the sender</string>
 </resources>

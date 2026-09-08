@@ -241,6 +241,55 @@ class RtcReceiver(
         }
     }
 
+    /**
+     * Poll inbound-rtp stats. Distinguishes the three ways a black screen can
+     * happen: no packets (network), packets but no decoded frames (decoder),
+     * or decoded frames that never paint (renderer/surface).
+     */
+    fun pollStats(cb: (Stats) -> Unit) {
+        val peer = pc ?: return
+        peer.getStats { report ->
+            var received = 0L; var decoded = 0L; var dropped = 0L; var bytes = 0L
+            var w = 0L; var h = 0L; var impl = "?"; var codecId: String? = null
+            var fps = 0.0
+
+            for (st in report.statsMap.values) {
+                if (st.type == "inbound-rtp" && st.members["kind"] == "video") {
+                    val m = st.members
+                    received = (m["framesReceived"] as? Number)?.toLong() ?: received
+                    decoded  = (m["framesDecoded"] as? Number)?.toLong() ?: decoded
+                    dropped  = (m["framesDropped"] as? Number)?.toLong() ?: dropped
+                    bytes    = (m["bytesReceived"] as? Number)?.toLong() ?: bytes
+                    w        = (m["frameWidth"] as? Number)?.toLong() ?: w
+                    h        = (m["frameHeight"] as? Number)?.toLong() ?: h
+                    fps      = (m["framesPerSecond"] as? Number)?.toDouble() ?: fps
+                    impl     = (m["decoderImplementation"] as? String) ?: impl
+                    codecId  = m["codecId"] as? String
+                }
+            }
+            // Resolve the codec MIME type (e.g. video/H264) from its own entry.
+            var codec = "?"
+            if (codecId != null) {
+                report.statsMap[codecId]?.let { c ->
+                    codec = (c.members["mimeType"] as? String) ?: "?"
+                }
+            }
+            cb(Stats(received, decoded, dropped, bytes, w.toInt(), h.toInt(), fps, codec, impl))
+        }
+    }
+
+    data class Stats(
+        val framesReceived: Long,
+        val framesDecoded: Long,
+        val framesDropped: Long,
+        val bytesReceived: Long,
+        val width: Int,
+        val height: Int,
+        val fps: Double,
+        val codec: String,
+        val decoder: String,
+    )
+
     /** Log the video codecs present in an SDP and which one is preferred. */
     private fun logCodecs(label: String, sdp: String) {
         try {

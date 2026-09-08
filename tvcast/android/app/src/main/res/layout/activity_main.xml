@@ -234,16 +234,23 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <TextView
-            android:id="@+id/txtDiag"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@color/tv_dim"
-            android:textSize="13sp"
-            android:visibility="gone"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:text="IP 192.168.1.50 · SM-T580 · API 28"
-            tools:visibility="visible" />
     </androidx.constraintlayout.widget.ConstraintLayout>
+    <!-- Diagnostics overlay. Declared last so it paints above both the video
+         surface and the lobby, and given a dark pill so it stays legible on
+         top of arbitrary video content. -->
+    <TextView
+        android:id="@+id/txtDiag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="10dp"
+        android:background="@drawable/pill_bg"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:textColor="@color/tv_fg"
+        android:textSize="13sp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="1920×1080 · dec 120 · drop 0 · paint 4 · 2048KB · H264 · OMX.hw"
+        tools:visibility="visible" />
 </androidx.constraintlayout.widget.ConstraintLayout>

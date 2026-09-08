@@ -40,6 +40,9 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
 
     private val main = Handler(Looper.getMainLooper())
     private var isLive = false
+    /** Incremented only when the GL renderer has actually drawn a frame. */
+    private var glPaintCount = 0
+    private var statsTimer: Runnable? = null
     private var currentRoom: String? = null
     private var lastJoinUrl: String? = null
 
@@ -59,6 +62,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         rtc = RtcReceiver(this, eglBase!!, this).also {
             it.attachRenderer(binding.videoView)
         }
+        installPaintCounter()
 
         binding.btnSettings.setOnClickListener { openSettings() }
         binding.btnRetry.setOnClickListener { restartSignaling() }
@@ -81,13 +85,67 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
             setEnableHardwareScaler(true)
             setMirror(false)
 
-            // INVISIBLE, not GONE. SurfaceViewRenderer is a SurfaceView: with
-            // GONE it is not laid out, so no Surface is created, EGL never
-            // attaches and every incoming frame is dropped - which showed up
-            // as a black screen with a live connection. INVISIBLE keeps the
-            // surface alive and ready behind the lobby.
-            visibility = View.INVISIBLE
+            // ALWAYS VISIBLE. SurfaceViewRenderer is a SurfaceView, and a
+            // SurfaceView only owns a Surface while it is VISIBLE - GONE *and*
+            // INVISIBLE both tear it down, so EGL never attaches and frames
+            // are dropped with no error. Instead of toggling this view, we
+            // leave it visible for the whole session and simply draw the lobby
+            // over it (the lobby is declared later in the layout, so it is
+            // painted on top). The surface is then alive before the first
+            // frame ever arrives.
+            visibility = View.VISIBLE
+
+            // Note: EglRenderer.setErrorCallback (GL OOM) is not re-exposed by
+            // SurfaceViewRenderer, so GL OOM shows up only in logcat. The
+            // paint counter below is our signal that rendering is healthy.
         }
+    }
+
+    /**
+     * Proof-of-paint counter. addFrameListener's callback runs only after the
+     * frame has been drawn on the GL thread, so it is the trustworthy
+     * counterpart to the misleadingly-named onFirstFrameRendered().
+     * Sampled at 1/30 of frames to keep the bitmap copies cheap.
+     */
+    private fun installPaintCounter() {
+        try {
+            binding.videoView.addFrameListener({ _ -> glPaintCount++ }, 1f / 30f)
+        } catch (t: Throwable) {
+            Log.w(TAG, "could not install paint counter: ${t.message}")
+        }
+    }
+
+    /** Poll receive-side stats and show them on screen while a peer is live. */
+    private fun startStatsOverlay() {
+        stopStatsOverlay()
+        val tick = object : Runnable {
+            override fun run() {
+                rtc?.pollStats { st ->
+                    main.post {
+                        val line = getString(
+                            R.string.diag_stats,
+                            st.width, st.height,
+                            st.framesDecoded, st.framesDropped,
+                            glPaintCount,
+                            st.bytesReceived / 1024,
+                            st.codec.removePrefix("video/"),
+                            st.decoder,
+                        )
+                        binding.txtDiag.visibility = View.VISIBLE
+                        binding.txtDiag.text = line
+                        Log.i(TAG, "stats: $line")
+                    }
+                }
+                main.postDelayed(this, 2000)
+            }
+        }
+        statsTimer = tick
+        main.post(tick)
+    }
+
+    private fun stopStatsOverlay() {
+        statsTimer?.let { main.removeCallbacks(it) }
+        statsTimer = null
     }
 
     /**
@@ -95,8 +153,13 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
      */
     private val rendererEvents = object : RendererCommon.RendererEvents {
         override fun onFirstFrameRendered() {
-            Log.i(TAG, "first frame rendered")
-            main.post { showLive() }
+            // NOTE: despite the name, the WebRTC implementation fires this from
+            // updateFrameDimensionsAndReportEvents() *before* the frame is
+            // drawn, so it means "a frame reached the renderer", not "a frame
+            // was painted". Verified against the 125.6422.07 bytecode. Use it
+            // only as a progress signal.
+            Log.i(TAG, "frame reached renderer")
+            main.post { if (!isLive) showLive() }
         }
 
         override fun onFrameResolutionChanged(width: Int, height: Int, rotation: Int) {
@@ -169,15 +232,21 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     }
 
     override fun onPeerLeave(peerId: String) {
+        stopStatsOverlay()
         rtc?.closePeer()
         isLive = false
         showLobby()
         binding.txtStatus.text = getString(R.string.status_ready)
+        if (!prefs.showDiagnostics) binding.txtDiag.visibility = View.GONE
     }
 
     override fun onOffer(sdp: String) {
         binding.txtStatus.text = getString(R.string.status_negotiating)
+        glPaintCount = 0
         rtc?.acceptOffer(sdp)
+        // Always run diagnostics during a session: a black screen is far more
+        // costly than a small text overlay.
+        startStatsOverlay()
     }
 
     override fun onIce(candidate: JSONObject) {
@@ -260,19 +329,17 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     // ---- UI state -----------------------------------------------------------
 
     private fun showLobby() {
+        // The video view stays visible underneath; the lobby covers it. This
+        // keeps the Surface alive so the next sender renders immediately.
         binding.lobby.visibility = View.VISIBLE
-        // INVISIBLE keeps the SurfaceView's surface allocated so the next
-        // stream can render immediately; GONE would tear it down and we would
-        // be back to dropping frames.
-        binding.videoView.visibility = View.INVISIBLE
         binding.txtLiveHint.visibility = View.GONE
         goImmersive()
     }
 
     private fun showLive() {
         isLive = true
+        // Just uncover the video view - it was already visible and rendering.
         binding.lobby.visibility = View.GONE
-        binding.videoView.visibility = View.VISIBLE
         goImmersive()
 
         // Brief hint that Back stops the stream, then fade out so it doesn't
@@ -377,6 +444,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
 
     override fun onDestroy() {
         super.onDestroy()
+        stopStatsOverlay()
         main.removeCallbacksAndMessages(null)
         signaling?.close()
         rtc?.release()
