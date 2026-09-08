@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Fullscreen, no ActionBar. Based on the AppCompat DayNight NoActionBar
+      theme so it behaves consistently from API 21 up to 34.
+    -->
+    <style name="Theme.PanelCast" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/tv_bg</item>
+        <item name="android:colorAccent">@color/tv_accent</item>
+        <item name="android:textColorPrimary">@color/tv_fg</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <!-- No activity animations: they stutter badly on old panel GPUs. -->
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

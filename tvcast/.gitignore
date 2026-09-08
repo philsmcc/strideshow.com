@@ -1,0 +1,26 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Android / Gradle
+*.iml
+.gradle/
+local.properties
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.keystore
+!debug.keystore
+keystore.properties
+
+# OS
+.DS_Store
+
+# Local SDK pointer (machine-specific)
+local.properties

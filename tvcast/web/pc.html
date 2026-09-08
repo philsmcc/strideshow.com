@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>PanelCast &middot; Share Your Screen</title>
+<link rel="stylesheet" href="../css/app.css">
+</head>
+<body>
+
+<div class="wrap" id="setup">
+  <header class="bar">
+    <div class="brand">Panel<span>Cast</span></div>
+    <div class="code-chip" id="codeChip">------</div>
+  </header>
+
+  <h1>Share your screen</h1>
+  <p class="lead">Pick a window, a browser tab, or your whole screen. It appears on the display in real time.</p>
+
+  <div id="notice" class="notice hidden"></div>
+
+  <div class="card">
+    <label class="field" id="codeField">
+      <span class="lbl">Code shown on the display</span>
+      <input type="text" id="roomInput" inputmode="latin" autocapitalize="characters"
+             autocomplete="off" spellcheck="false" maxlength="6" placeholder="ABC123">
+    </label>
+
+    <label class="field">
+      <span class="lbl">Optimise for</span>
+      <div class="row">
+        <button class="secondary" id="btnText">Text &amp; slides</button>
+        <button class="secondary" id="btnMotion">Video</button>
+      </div>
+    </label>
+
+    <label class="field">
+      <span class="lbl">Quality ceiling</span>
+      <div class="slider-row">
+        <input type="range" id="bitrate" min="2" max="16" step="1" value="10">
+        <span class="val" id="bitrateVal">10 Mbps</span>
+      </div>
+    </label>
+
+    <button id="btnStart">Choose what to share</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <p class="hint">
+    <b>Sharpest text:</b> keep <b>Text &amp; slides</b> selected and share a single
+    window rather than the whole desktop.
+  </p>
+
+  <footer class="foot">Nothing is recorded. Video goes straight to the display.</footer>
+</div>
+
+<div class="stage" id="stage">
+  <video id="preview" autoplay playsinline muted></video>
+  <div class="pill"><span class="dot" id="dot"></span><span id="statLine">connecting</span></div>
+  <div class="overlay">
+    <button class="danger" id="btnStop">Stop sharing</button>
+    <button class="secondary" id="btnSwap">Change source</button>
+  </div>
+</div>
+
+<script type="module">
+import { Sender, roomFromLocation } from "../js/sender.js";
+
+const $ = (id) => document.getElementById(id);
+const setup = $('setup'), stage = $('stage'), video = $('preview');
+const statusEl = $('status'), noticeEl = $('notice');
+
+let sender = null;
+let stream = null;
+let mode = 'detail';   // 'detail' = text/slides, 'motion' = video
+
+const prefilled = roomFromLocation();
+if (prefilled) {
+  $('roomInput').value = prefilled;
+  $('codeChip').textContent = prefilled;
+  $('codeField').classList.add('hidden');
+}
+
+// getDisplayMedia is unavailable on iOS Safari and older Android browsers -
+// screen sharing is inherently a desktop feature here.
+if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+  const insecure = location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname);
+  showNotice(insecure
+    ? 'Screen sharing needs a secure (https) connection.'
+    : 'This browser cannot share a screen. Use Chrome, Edge, or Firefox on a computer.', true);
+  $('btnStart').disabled = true;
+}
+
+function showNotice(msg, isErr) {
+  noticeEl.textContent = msg;
+  noticeEl.classList.remove('hidden');
+  noticeEl.classList.toggle('err', !!isErr);
+}
+function setStatus(msg, isErr) {
+  statusEl.textContent = msg || '';
+  statusEl.classList.toggle('err', !!isErr);
+}
+
+function selectMode(m) {
+  mode = m;
+  $('btnText').style.borderColor   = m === 'detail' ? 'var(--accent)' : 'var(--line)';
+  $('btnMotion').style.borderColor = m === 'motion' ? 'var(--accent)' : 'var(--line)';
+  // Text needs bitrate for sharpness; video needs it for smoothness. Both
+  // benefit, but text benefits from a higher default ceiling.
+  $('bitrate').value = m === 'detail' ? 10 : 8;
+  syncBitrateLabel();
+}
+selectMode('detail');
+$('btnText').onclick   = () => selectMode('detail');
+$('btnMotion').onclick = () => selectMode('motion');
+
+function syncBitrateLabel() { $('bitrateVal').textContent = $('bitrate').value + ' Mbps'; }
+$('bitrate').oninput = syncBitrateLabel;
+
+$('roomInput').addEventListener('input', (e) => {
+  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  $('codeChip').textContent = e.target.value.padEnd(6, '-');
+});
+
+async function pickScreen() {
+  return navigator.mediaDevices.getDisplayMedia({
+    audio: false, // audio would need a second track and echoes in a room
+    video: {
+      width:  { ideal: 1920, max: 1920 },
+      height: { ideal: 1080, max: 1080 },
+      // 30fps for video, lower for slides: fewer frames means more bits per
+      // frame, which is what keeps text crisp.
+      frameRate: { ideal: mode === 'motion' ? 30 : 15, max: 30 },
+      cursor: 'always',
+    },
+  });
+}
+
+$('btnStart').onclick = async () => {
+  const room = $('roomInput').value.trim().toUpperCase();
+  if (room.length < 4) return setStatus('Enter the code from the display.', true);
+
+  $('btnStart').disabled = true;
+  setStatus('Waiting for you to choose a source…');
+
+  try {
+    stream = await pickScreen();
+  } catch (err) {
+    $('btnStart').disabled = false;
+    if (err && err.name === 'NotAllowedError') return setStatus('Screen share was cancelled.', false);
+    return setStatus('Could not start screen capture: ' + ((err && err.name) || 'unknown'), true);
+  }
+
+  // Browser-native "Stop sharing" button ends the track; mirror that in our UI.
+  stream.getVideoTracks()[0].addEventListener('ended', () => {
+    if (sender) sender.close();
+    sender = null;
+    returnToSetup('Screen sharing stopped.');
+  });
+
+  video.srcObject = stream;
+  setup.classList.add('hidden');
+  stage.classList.add('on');
+
+  const kbps = parseInt($('bitrate').value, 10) * 1000;
+  sender = new Sender({ room, role: 'screen', onState: onSenderState });
+  sender.onStats = (s) => {
+    if (!s.width) return;
+    $('statLine').textContent = `${s.width}×${s.height} · ${s.fps}fps · ${(s.kbps / 1000).toFixed(1)} Mbps`;
+  };
+  await sender.connect(stream, kbps);
+
+  // Apply the chosen hint after tracks are attached.
+  const track = stream.getVideoTracks()[0];
+  if ('contentHint' in track) track.contentHint = mode;
+};
+
+function onSenderState(state, detail) {
+  const dot = $('dot'), line = $('statLine');
+  if (state === 'live') { dot.className = 'dot live'; line.textContent = 'live'; }
+  else if (state === 'connecting' || state === 'signaling') { dot.className = 'dot warn'; line.textContent = 'connecting'; }
+  else if (state === 'reconnecting') { dot.className = 'dot warn'; line.textContent = 'reconnecting'; }
+  else if (state === 'error') { dot.className = 'dot err'; returnToSetup(detail); }
+  else if (state === 'disconnected') { dot.className = 'dot err'; returnToSetup('The session ended.'); }
+}
+
+function returnToSetup(msg) {
+  stage.classList.remove('on');
+  setup.classList.remove('hidden');
+  $('btnStart').disabled = false;
+  if (stream) { for (const t of stream.getTracks()) { try { t.stop(); } catch (_) {} } stream = null; }
+  if (msg) showNotice(msg, true);
+}
+
+/** Swap the shared window without dropping the WebRTC session. */
+$('btnSwap').onclick = async () => {
+  if (!sender || !sender.pc) return;
+  let newStream;
+  try { newStream = await pickScreen(); } catch (_) { return; }
+
+  const newTrack = newStream.getVideoTracks()[0];
+  if ('contentHint' in newTrack) newTrack.contentHint = mode;
+  const vsender = sender.pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+  if (vsender) await vsender.replaceTrack(newTrack);
+
+  newTrack.addEventListener('ended', () => {
+    if (sender) sender.close();
+    sender = null;
+    returnToSetup('Screen sharing stopped.');
+  });
+
+  for (const t of stream.getTracks()) t.stop();
+  stream = newStream;
+  sender.stream = newStream;
+  video.srcObject = newStream;
+};
+
+$('btnStop').onclick = () => {
+  if (sender) sender.close();
+  sender = null;
+  returnToSetup('');
+};
+
+window.addEventListener('pagehide', () => { if (sender) sender.close(); });
+</script>
+</body>
+</html>

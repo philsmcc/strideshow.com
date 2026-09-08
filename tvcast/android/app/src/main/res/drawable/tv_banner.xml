@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android TV launcher banner. The leanback launcher expects a 320x180 asset;
+  this vector scales to whatever the launcher requests.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <path
+        android:fillColor="#0B0F17"
+        android:pathData="M0,0h320v180h-320z" />
+
+    <!-- accent bar -->
+    <path
+        android:fillColor="#3D8BFD"
+        android:pathData="M0,0h6v180h-6z" />
+
+    <!-- panel glyph -->
+    <path
+        android:fillColor="#3D8BFD"
+        android:pathData="M36,54 h74 a5,5 0 0 1 5,5 v42 a5,5 0 0 1 -5,5 h-74 a5,5 0 0 1 -5,-5 v-42 a5,5 0 0 1 5,-5 z" />
+    <path
+        android:fillColor="#0B0F17"
+        android:pathData="M39,60 h68 v30 h-68 z" />
+    <path
+        android:fillColor="#3D8BFD"
+        android:pathData="M64,110 h18 v6 h-18 z M52,119 h42 v5 h-42 z" />
+
+    <path
+        android:fillColor="#E8EDF5"
+        android:pathData="M73,68 m-3.6,0 a3.6,3.6 0 1,0 7.2,0 a3.6,3.6 0 1,0 -7.2,0" />
+    <path
+        android:strokeColor="#E8EDF5"
+        android:strokeWidth="3.4"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M62,79 a15,15 0 0 1 22,0" />
+
+    <!-- wordmark: drawn as paths so no font dependency -->
+    <group android:translateX="140" android:translateY="72">
+        <!-- P -->
+        <path android:fillColor="#E8EDF5" android:pathData="M0,0 h5 v34 h-5 z M0,0 h14 a9,9 0 0 1 0,18 h-14 v-5 h13 a4,4 0 0 0 0,-8 h-13 z" />
+        <!-- a -->
+        <path android:fillColor="#E8EDF5" android:pathData="M22,14 h11 a5,5 0 0 1 5,5 v15 h-5 v-4 h-8 a6,6 0 0 1 0,-12 h8 v-1 h-11 z M25,25 h8 v4 h-8 a2,2 0 0 1 0,-4 z" />
+        <!-- n -->
+        <path android:fillColor="#E8EDF5" android:pathData="M43,14 h5 v20 h-5 z M43,14 h9 a8,8 0 0 1 8,8 v12 h-5 v-11 a4,4 0 0 0 -4,-4 h-8 z" />
+        <!-- e -->
+        <path android:fillColor="#E8EDF5" android:pathData="M65,24 a10,10 0 0 1 20,0 v3 h-20 v-3 z M70,22 h10 a5,5 0 0 0 -10,0 z M65,27 a10,10 0 0 0 18,5 h-6 a5,5 0 0 1 -7,-2 z" />
+        <!-- l -->
+        <path android:fillColor="#E8EDF5" android:pathData="M90,2 h5 v32 h-5 z" />
+        <!-- C (accent) -->
+        <path android:fillColor="#3D8BFD" android:pathData="M108,17 a17,17 0 0 1 26,-3 l-4,4 a12,12 0 1 0 0,18 l4,4 a17,17 0 0 1 -26,-23 z" />
+        <!-- a -->
+        <path android:fillColor="#3D8BFD" android:pathData="M138,14 h11 a5,5 0 0 1 5,5 v15 h-5 v-4 h-8 a6,6 0 0 1 0,-12 h8 v-1 h-11 z M141,25 h8 v4 h-8 a2,2 0 0 1 0,-4 z" />
+        <!-- s -->
+        <path android:fillColor="#3D8BFD" android:pathData="M159,30 h11 a2,2 0 0 0 0,-4 h-6 a6,6 0 0 1 0,-12 h10 v4 h-10 a2,2 0 0 0 0,4 h6 a6,6 0 0 1 0,12 h-11 z" />
+        <!-- t -->
+        <path android:fillColor="#3D8BFD" android:pathData="M181,6 h5 v28 h-5 z M176,14 h15 v4 h-15 z" />
+    </group>
+
+    <path
+        android:fillColor="#93A1B5"
+        android:pathData="M140,124 h1 v1 h-1 z" />
+</vector>

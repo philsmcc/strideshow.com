@@ -1,0 +1,88 @@
+name: PanelCast APK
+
+# Builds the Android TV receiver APK and publishes it as a downloadable
+# artifact. Runs only when the tvcast/android project changes, so it never
+# interferes with the StrideShow app.
+on:
+  push:
+    branches: [ main, genspark_ai_developer, tvcast-panelcast ]
+    paths:
+      - 'tvcast/android/**'
+      - '.github/workflows/panelcast-apk.yml'
+  pull_request:
+    paths:
+      - 'tvcast/android/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tvcast/android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Provisions Gradle 8.7 and handles dependency caching. Using this action
+      # means the repo does not need a committed gradle-wrapper.jar binary.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      # Fail fast on Kotlin/resource errors before the slower assemble step.
+      - name: Compile check
+        run: gradle --no-daemon compileDebugKotlin
+
+      - name: Unit tests (SDP codec preference)
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Build debug APKs
+        run: gradle --no-daemon assembleDebug
+
+      - name: Build release APKs (unsigned unless keystore configured)
+        run: gradle --no-daemon assembleRelease
+        continue-on-error: true
+
+      - name: List built APKs
+        if: always()
+        run: |
+          echo "--- debug ---"
+          find app/build/outputs/apk/debug -name '*.apk' -printf '%f  %s bytes\n' 2>/dev/null || echo none
+          echo "--- release ---"
+          find app/build/outputs/apk/release -name '*.apk' -printf '%f  %s bytes\n' 2>/dev/null || echo none
+
+      # The universal debug APK is the one to sideload if unsure of the panel's
+      # CPU architecture - it contains every ABI.
+      - name: Upload debug APKs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: panelcast-debug-apks
+          path: tvcast/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload release APKs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: panelcast-release-apks
+          path: tvcast/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
+          retention-days: 30

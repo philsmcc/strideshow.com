@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>PanelCast &middot; Phone Camera</title>
+<link rel="stylesheet" href="../css/app.css">
+</head>
+<body>
+
+<div class="wrap" id="setup">
+  <header class="bar">
+    <div class="brand">Panel<span>Cast</span></div>
+    <div class="code-chip" id="codeChip">------</div>
+  </header>
+
+  <h1>Use this phone as a camera</h1>
+  <p class="lead">Your camera will appear on the display. Great as a live viewer or a document camera for showing paper, objects, or a whiteboard.</p>
+
+  <div id="notice" class="notice hidden"></div>
+
+  <div class="card">
+    <label class="field" id="codeField">
+      <span class="lbl">Code shown on the display</span>
+      <input type="text" id="roomInput" inputmode="latin" autocapitalize="characters"
+             autocomplete="off" spellcheck="false" maxlength="6" placeholder="ABC123">
+    </label>
+
+    <label class="field">
+      <span class="lbl">Camera</span>
+      <div class="row">
+        <button class="secondary" id="btnRear">Rear camera</button>
+        <button class="secondary" id="btnFront">Front camera</button>
+      </div>
+    </label>
+
+    <button id="btnStart">Start sharing</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <p class="hint">
+    <b>Document camera tip:</b> prop the phone so the rear camera looks down at your page,
+    then use <b>Zoom</b> and <b>Light</b> once you are live.
+  </p>
+
+  <footer class="foot">Nothing is recorded. Video goes straight to the display.</footer>
+</div>
+
+<div class="stage" id="stage">
+  <video id="preview" autoplay playsinline muted></video>
+  <div class="pill"><span class="dot" id="dot"></span><span id="statLine">connecting</span></div>
+  <div class="overlay">
+    <button class="danger" id="btnStop">Stop</button>
+    <button class="secondary" id="btnTorch">Light</button>
+    <button class="secondary" id="btnFlip">Flip</button>
+    <button class="secondary" id="btnFocus">Focus</button>
+  </div>
+</div>
+
+<script type="module">
+import { Sender, roomFromLocation } from "../js/sender.js";
+
+const $ = (id) => document.getElementById(id);
+const setup = $('setup'), stage = $('stage'), video = $('preview');
+const statusEl = $('status'), noticeEl = $('notice');
+
+let facing = 'environment';
+let sender = null;
+let stream = null;
+let torchOn = false;
+
+// Phone camera: 1080p is the sweet spot. 4K would look better in theory but old
+// TV decoders top out at 1080p and the extra bitrate just causes drops.
+const CAM_BITRATE_KBPS = 6000;
+
+const prefilled = roomFromLocation();
+if (prefilled) {
+  $('roomInput').value = prefilled;
+  $('codeChip').textContent = prefilled;
+  $('codeField').classList.add('hidden');   // came from a QR scan, no typing needed
+}
+
+// Hard requirement check: getUserMedia needs a secure context.
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  const insecure = location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname);
+  showNotice(insecure
+    ? 'Camera access needs a secure (https) connection. Open this page over https.'
+    : 'This browser does not support camera capture. Try Chrome or Safari.', true);
+  $('btnStart').disabled = true;
+}
+
+function showNotice(msg, isErr) {
+  noticeEl.textContent = msg;
+  noticeEl.classList.remove('hidden');
+  noticeEl.classList.toggle('err', !!isErr);
+}
+function setStatus(msg, isErr) {
+  statusEl.textContent = msg || '';
+  statusEl.classList.toggle('err', !!isErr);
+}
+
+function selectFacing(f) {
+  facing = f;
+  $('btnRear').style.borderColor  = f === 'environment' ? 'var(--accent)' : 'var(--line)';
+  $('btnFront').style.borderColor = f === 'user' ? 'var(--accent)' : 'var(--line)';
+}
+selectFacing('environment');
+$('btnRear').onclick  = () => selectFacing('environment');
+$('btnFront').onclick = () => selectFacing('user');
+
+$('roomInput').addEventListener('input', (e) => {
+  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  $('codeChip').textContent = e.target.value.padEnd(6, '-');
+});
+
+async function getCameraStream(facingMode) {
+  // Ask for 1080p but stay flexible: `ideal` lets the browser fall back on
+  // phones whose rear camera has odd native modes, instead of hard-failing.
+  const constraints = {
+    audio: false,
+    video: {
+      facingMode: { ideal: facingMode },
+      width:  { ideal: 1920 },
+      height: { ideal: 1080 },
+      frameRate: { ideal: 30, max: 30 },
+    },
+  };
+  try {
+    return await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (err) {
+    if (err && (err.name === 'OverconstrainedError' || err.name === 'NotFoundError')) {
+      return await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facingMode } } });
+    }
+    throw err;
+  }
+}
+
+$('btnStart').onclick = async () => {
+  const room = $('roomInput').value.trim().toUpperCase();
+  if (room.length < 4) return setStatus('Enter the code from the display.', true);
+
+  $('btnStart').disabled = true;
+  setStatus('Requesting camera…');
+
+  try {
+    stream = await getCameraStream(facing);
+  } catch (err) {
+    $('btnStart').disabled = false;
+    const name = err && err.name;
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return setStatus('Camera permission was denied. Allow access and try again.', true);
+    }
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+      return setStatus('The camera is in use by another app. Close it and retry.', true);
+    }
+    return setStatus('Could not open the camera: ' + (name || 'unknown error'), true);
+  }
+
+  video.srcObject = stream;
+  setup.classList.add('hidden');
+  stage.classList.add('on');
+  updateCapabilityButtons();
+  await keepAwake();
+
+  sender = new Sender({ room, role: 'camera', onState: onSenderState });
+  sender.onStats = (s) => {
+    if (!s.width) return;
+    $('statLine').textContent = `${s.width}×${s.height} · ${s.fps}fps · ${(s.kbps / 1000).toFixed(1)} Mbps`;
+  };
+  await sender.connect(stream, CAM_BITRATE_KBPS);
+};
+
+function onSenderState(state, detail) {
+  const dot = $('dot'), line = $('statLine');
+  if (state === 'live') { dot.className = 'dot live'; line.textContent = 'live'; }
+  else if (state === 'connecting' || state === 'signaling') { dot.className = 'dot warn'; line.textContent = 'connecting'; }
+  else if (state === 'reconnecting') { dot.className = 'dot warn'; line.textContent = 'reconnecting'; }
+  else if (state === 'error') { dot.className = 'dot err'; line.textContent = detail || 'error'; returnToSetup(detail); }
+  else if (state === 'disconnected') { dot.className = 'dot err'; line.textContent = 'disconnected'; returnToSetup('The session ended.'); }
+}
+
+function returnToSetup(msg) {
+  stage.classList.remove('on');
+  setup.classList.remove('hidden');
+  $('btnStart').disabled = false;
+  if (msg) showNotice(msg, true);
+  releaseAwake();
+}
+
+/** Only show controls the hardware actually supports. */
+function updateCapabilityButtons() {
+  const track = stream.getVideoTracks()[0];
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  $('btnTorch').classList.toggle('hidden', !('torch' in caps));
+  $('btnFocus').classList.toggle('hidden', !(caps.focusMode && caps.focusMode.length));
+}
+
+$('btnTorch').onclick = async () => {
+  const track = stream.getVideoTracks()[0];
+  torchOn = !torchOn;
+  try {
+    await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+    $('btnTorch').style.borderColor = torchOn ? 'var(--accent)' : 'var(--line)';
+  } catch (_) {
+    torchOn = false;
+    $('btnTorch').classList.add('hidden');
+  }
+};
+
+$('btnFocus').onclick = async () => {
+  const track = stream.getVideoTracks()[0];
+  try {
+    // Nudge into single-shot autofocus - the usual fix when a document camera
+    // shot sits blurry because continuous AF locked onto the background.
+    await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+    setTimeout(() => track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}), 1800);
+  } catch (_) {}
+};
+
+/**
+ * Flip camera without renegotiating: swap the track on the existing sender.
+ * replaceTrack keeps the same SSRC so the TV never sees an interruption.
+ */
+$('btnFlip').onclick = async () => {
+  if (!sender || !sender.pc) return;
+  const next = facing === 'environment' ? 'user' : 'environment';
+  let newStream;
+  try {
+    newStream = await getCameraStream(next);
+  } catch (_) { return; }
+
+  const newTrack = newStream.getVideoTracks()[0];
+  const vsender = sender.pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+  if (vsender) {
+    if ('contentHint' in newTrack) newTrack.contentHint = 'detail';
+    await vsender.replaceTrack(newTrack);
+  }
+  for (const t of stream.getTracks()) t.stop();
+  stream = newStream;
+  sender.stream = newStream;
+  video.srcObject = newStream;
+  facing = next;
+  torchOn = false;
+  updateCapabilityButtons();
+};
+
+$('btnStop').onclick = () => {
+  if (sender) sender.close();
+  sender = null;
+  returnToSetup('');
+};
+
+// Keep the screen on while sending; phones otherwise sleep and kill the camera.
+let wakeLock = null;
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+  } catch (_) { /* unsupported or denied - harmless */ }
+}
+function releaseAwake() {
+  if (wakeLock) { try { wakeLock.release(); } catch (_) {} wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && stage.classList.contains('on') && !wakeLock) keepAwake();
+});
+
+window.addEventListener('pagehide', () => { if (sender) sender.close(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RELEASE policy: TLS only. All signaling must be wss://.
+  Note: Android's network security config matches hostnames, not IP ranges,
+  so there is no way to whitelist "the whole LAN" here. Developers who need a
+  plain ws:// server on the local network should use the debug build, which
+  overrides this file with a permissive version (see src/debug/res/xml/).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

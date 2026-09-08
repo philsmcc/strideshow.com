@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PanelCast</string>
+
+    <!-- Lobby -->
+    <string name="lobby_title">Share to this display</string>
+    <string name="lobby_step_phone">Scan with your phone camera</string>
+    <string name="lobby_step_code">Or enter this code</string>
+    <string name="join_hint">Go to %1$s on your phone or computer</string>
+    <string name="qr_fallback">Enter the code below on your phone</string>
+
+    <!-- Status line -->
+    <string name="status_connecting">Connecting to server…</string>
+    <string name="status_reconnecting">Reconnecting…</string>
+    <string name="status_ready">Ready — waiting for a connection</string>
+    <string name="status_peer_joining">%1$s connecting…</string>
+    <string name="status_negotiating">Starting video…</string>
+    <string name="status_failed">Cannot reach the server</string>
+    <string name="peer_camera">Phone camera</string>
+    <string name="peer_screen">Screen share</string>
+
+    <string name="live_hint">Press Back to stop</string>
+    <string name="btn_retry">Retry</string>
+    <string name="btn_settings">Settings</string>
+
+    <!-- Diagnostics -->
+    <string name="diag_net">IP %1$s · %2$s · API %3$d</string>
+    <string name="diag_ice">ICE: %1$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">PanelCast Settings</string>
+    <string name="settings_url_label">Signaling server (wss:// or ws://)</string>
+    <string name="settings_diag_label">Show diagnostics on the lobby screen</string>
+    <string name="settings_default">Default: %1$s</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_reset">Reset to default</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_saved">Saved</string>
+    <string name="settings_reset_done">Reset to default server</string>
+</resources>

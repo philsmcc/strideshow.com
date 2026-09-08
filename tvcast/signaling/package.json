@@ -1,0 +1,17 @@
+{
+  "name": "panelcast-signaling",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Signaling server + sender web pages for the PanelCast Android TV receiver",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "PANELCAST_HOST=0.0.0.0 PANELCAST_PUBLIC_BASE=http://localhost:3100 node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

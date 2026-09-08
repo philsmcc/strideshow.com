@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App icon as a vector: VectorDrawable is supported natively from API 21, so a
+  single asset covers every density without shipping PNG variants.
+  Motif: a display panel with a broadcast arc.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#0B0F17"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <!-- panel body -->
+    <path
+        android:fillColor="#3D8BFD"
+        android:pathData="M22,34 h64 a5,5 0 0 1 5,5 v30 a5,5 0 0 1 -5,5 h-64 a5,5 0 0 1 -5,-5 v-30 a5,5 0 0 1 5,-5 z" />
+    <!-- screen inset -->
+    <path
+        android:fillColor="#0B0F17"
+        android:pathData="M25,40 h58 v22 h-58 z" />
+    <!-- stand -->
+    <path
+        android:fillColor="#3D8BFD"
+        android:pathData="M46,76 h16 v5 h-16 z M36,83 h38 v4 h-38 z" />
+
+    <!-- broadcast arcs -->
+    <path
+        android:fillColor="#E8EDF5"
+        android:pathData="M54,45 m-3.2,0 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" />
+    <path
+        android:strokeColor="#E8EDF5"
+        android:strokeWidth="3"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M44,54 a13,13 0 0 1 20,0" />
+    <path
+        android:strokeColor="#93A1B5"
+        android:strokeWidth="2.5"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M38,58 a22,22 0 0 1 32,0" />
+</vector>

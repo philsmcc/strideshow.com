@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="tv_bg">#0B0F17</color>
+    <color name="tv_panel">#151B26</color>
+    <color name="tv_panel2">#1D2532</color>
+    <color name="tv_line">#2A3442</color>
+    <color name="tv_fg">#E8EDF5</color>
+    <color name="tv_muted">#93A1B5</color>
+    <color name="tv_dim">#5F6B7D</color>
+    <color name="tv_accent">#3D8BFD</color>
+    <color name="tv_accent_press">#2F6FD0</color>
+    <color name="tv_err">#E05A5A</color>
+</resources>
