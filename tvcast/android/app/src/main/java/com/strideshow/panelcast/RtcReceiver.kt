@@ -166,6 +166,11 @@ class RtcReceiver(
             return
         }
 
+        // Surface the codec situation in logs: a black screen with a healthy
+        // connection is usually a decoder problem, and this is the fastest way
+        // to tell whether H.264 was even on the table.
+        logCodecs("offer", sdp)
+
         pc?.setRemoteDescription(
             object : SdpObserverAdapter() {
                 override fun onSetSuccess() = createAnswer()
@@ -189,6 +194,7 @@ class RtcReceiver(
                 // Reorder codecs so our hardware-friendly H.264 comes first;
                 // the sender already prefers it, this makes it mutual.
                 val tuned = SdpUtils.preferH264(desc.description)
+                logCodecs("answer", tuned)
                 val finalDesc = SessionDescription(desc.type, tuned)
 
                 pc?.setLocalDescription(object : SdpObserverAdapter() {
@@ -214,17 +220,45 @@ class RtcReceiver(
         val view = renderer ?: return
         try {
             track.setEnabled(true)
-            track.addSink { frame ->
+            // Add the renderer itself as the sink rather than wrapping it in a
+            // lambda: SurfaceViewRenderer implements VideoSink and handles the
+            // render-thread hand-off internally. The "did it actually paint?"
+            // signal comes from RendererEvents.onFirstFrameRendered(), not
+            // from frames arriving here.
+            track.addSink(view)
+            // Separate lightweight sink purely to report that bytes are
+            // flowing, so the lobby can show progress before the first paint.
+            track.addSink {
                 if (!firstFrameSeen) {
                     firstFrameSeen = true
                     listener.onFirstFrame()
                 }
-                view.onFrame(frame)
             }
-            Log.i(TAG, "video track bound")
+            Log.i(TAG, "video track bound to renderer")
         } catch (t: Throwable) {
             Log.e(TAG, "failed to bind video: ${t.message}")
             listener.onStreamEnded("Could not display the video")
+        }
+    }
+
+    /** Log the video codecs present in an SDP and which one is preferred. */
+    private fun logCodecs(label: String, sdp: String) {
+        try {
+            val lines = sdp.split("\r\n", "\n")
+            val mLine = lines.firstOrNull { it.startsWith("m=video") } ?: return
+            val payloads = mLine.split(" ").drop(3)
+            val names = payloads.mapNotNull { pt ->
+                lines.firstOrNull { it.startsWith("a=rtpmap:$pt ") }
+                    ?.substringAfter("a=rtpmap:$pt ")?.substringBefore("/")
+                    ?.let { "$pt=$it" }
+            }
+            Log.i(TAG, "$label video codecs (in priority order): ${names.joinToString(", ")}")
+            val first = names.firstOrNull()
+            if (first != null && !first.contains("H264", ignoreCase = true)) {
+                Log.w(TAG, "$label does NOT prefer H.264 - hardware decode unlikely on this device")
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "codec log failed: ${t.message}")
         }
     }
 
@@ -238,6 +272,12 @@ class RtcReceiver(
     }
 
     fun closePeer() {
+        // Detach the renderer before disposing the peer: leaving a dead track
+        // wired to the SurfaceView leaks the sink and can leave a stale last
+        // frame on screen when the next sender connects.
+        remoteVideoTrack?.let { track ->
+            renderer?.let { view -> try { track.removeSink(view) } catch (_: Exception) {} }
+        }
         remoteVideoTrack = null
         firstFrameSeen = false
         pc?.let {

@@ -117,6 +117,23 @@ async function main() {
     const trav = await fetch(BASE + MOUNT + '/../signaling/server.js');
     ok('path traversal blocked', trav.status === 403 || trav.status === 404, 'status ' + trav.status);
 
+    // Regression: the bare mount must 301 to the trailing-slash form.
+    // Without it, relative assets resolved one level too high and the
+    // landing page's navigation built /pc/CODE instead of /panelcast/pc/CODE,
+    // which 404'd - the "desktop share goes to not found" bug.
+    const bare = await fetch(BASE + MOUNT, { redirect: 'manual' });
+    ok('bare mount redirects to trailing slash',
+       bare.status === 301 && (bare.headers.get('location') || '').endsWith(MOUNT + '/'),
+       `${bare.status} ${bare.headers.get('location')}`);
+
+    // Regression: every HTML page must carry the authoritative base path so
+    // clients never infer it from an ambiguous location.pathname.
+    for (const p of ['/', '/j/ABC123', '/pc/ABC123']) {
+      const body = await (await fetch(BASE + MOUNT + p)).text();
+      ok(`base path injected into ${p}`,
+         body.includes(`window.PANELCAST_BASE=${JSON.stringify(MOUNT)}`), p);
+    }
+
     // A wrong WS path must be refused, not left hanging.
     const badWs = await new Promise((res) => {
       const w = new WebSocket(`ws://127.0.0.1:${PORT}/nope`);

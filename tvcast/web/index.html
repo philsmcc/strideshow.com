@@ -52,8 +52,16 @@ function go(prefix) {
     status.className = 'status err';
     return;
   }
-  // Relative to the current directory so this works under /panelcast too.
-  var base = location.pathname.replace(/\/[^/]*$/, '');
+  // Build the target relative to the *directory* we are in.
+  //
+  // Careful: /panelcast (no trailing slash) and /panelcast/ are both valid
+  // entry points but have different "directories". Stripping the last
+  // segment from /panelcast yields "", which sent users to /pc/CODE and
+  // 404'd. Trust the server-supplied base path instead, falling back to a
+  // trailing-slash-aware computation.
+  var base = (window.PANELCAST_BASE !== undefined)
+    ? window.PANELCAST_BASE
+    : location.pathname.replace(/\/+$/, '');
   location.href = base + '/' + prefix + '/' + code;
 }
 document.getElementById('goPhone').onclick = function () { go('j'); };

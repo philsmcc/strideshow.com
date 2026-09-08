@@ -72,13 +72,41 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
 
     private fun setupRenderer() {
         binding.videoView.apply {
-            init(eglBase!!.eglBaseContext, null)
+            // RendererEvents tells us when a frame is genuinely painted, which
+            // is the only reliable signal for swapping the lobby out.
+            init(eglBase!!.eglBaseContext, rendererEvents)
             // SCALE_ASPECT_FIT: never crop the sender's content. A cropped
             // slide or document is worse than black bars.
             setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
             setEnableHardwareScaler(true)
             setMirror(false)
-            visibility = View.GONE
+
+            // INVISIBLE, not GONE. SurfaceViewRenderer is a SurfaceView: with
+            // GONE it is not laid out, so no Surface is created, EGL never
+            // attaches and every incoming frame is dropped - which showed up
+            // as a black screen with a live connection. INVISIBLE keeps the
+            // surface alive and ready behind the lobby.
+            visibility = View.INVISIBLE
+        }
+    }
+
+    /**
+     * Fired on the render thread by the EGL renderer.
+     */
+    private val rendererEvents = object : RendererCommon.RendererEvents {
+        override fun onFirstFrameRendered() {
+            Log.i(TAG, "first frame rendered")
+            main.post { showLive() }
+        }
+
+        override fun onFrameResolutionChanged(width: Int, height: Int, rotation: Int) {
+            Log.i(TAG, "resolution ${width}x$height rot=$rotation")
+            main.post {
+                if (prefs.showDiagnostics) {
+                    binding.txtDiag.visibility = View.VISIBLE
+                    binding.txtDiag.text = getString(R.string.diag_video, width, height, rotation)
+                }
+            }
         }
     }
 
@@ -198,8 +226,16 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         signaling?.sendIce(candidate)
     }
 
+    /**
+     * Frames are arriving from the network. This is NOT the cue to show the
+     * video - a frame can arrive and still fail to paint. We wait for the
+     * renderer's onFirstFrameRendered() for that, and only use this to update
+     * the status text so the lobby shows progress.
+     */
     override fun onFirstFrame() {
-        main.post { showLive() }
+        main.post {
+            if (!isLive) binding.txtStatus.text = getString(R.string.status_receiving)
+        }
     }
 
     override fun onStreamEnded(reason: String) {
@@ -225,7 +261,10 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
 
     private fun showLobby() {
         binding.lobby.visibility = View.VISIBLE
-        binding.videoView.visibility = View.GONE
+        // INVISIBLE keeps the SurfaceView's surface allocated so the next
+        // stream can render immediately; GONE would tear it down and we would
+        // be back to dropping frames.
+        binding.videoView.visibility = View.INVISIBLE
         binding.txtLiveHint.visibility = View.GONE
         goImmersive()
     }

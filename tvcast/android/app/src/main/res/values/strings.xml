@@ -15,6 +15,7 @@
     <string name="status_ready">Ready — waiting for a connection</string>
     <string name="status_peer_joining">%1$s connecting…</string>
     <string name="status_negotiating">Starting video…</string>
+    <string name="status_receiving">Receiving video…</string>
     <string name="status_failed">Cannot reach the server</string>
     <string name="peer_camera">Phone camera</string>
     <string name="peer_screen">Screen share</string>
@@ -26,6 +27,7 @@
     <!-- Diagnostics -->
     <string name="diag_net">IP %1$s · %2$s · API %3$d</string>
     <string name="diag_ice">ICE: %1$s</string>
+    <string name="diag_video">Video %1$d×%2$d rot %3$d</string>
 
     <!-- Settings -->
     <string name="settings_title">PanelCast Settings</string>

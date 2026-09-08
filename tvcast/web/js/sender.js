@@ -15,9 +15,13 @@ import { tuneOffer } from './sdp.js';
  * under a path like /panelcast.
  */
 function detectBasePath() {
+  // The server injects this into every HTML page - authoritative, and avoids
+  // guessing from a URL shape that varies (/mount, /mount/, /mount/j/CODE).
+  if (typeof window.PANELCAST_BASE === 'string') return window.PANELCAST_BASE;
+
+  // Fallbacks for opening a page directly during development.
   const m = location.pathname.match(/^(.*?)\/(?:j|pc)\/[A-Za-z0-9]{4,12}\/?$/);
   if (m) return m[1];
-  // Fallback: strip a trailing file name (e.g. /panelcast/phone.html).
   return location.pathname.replace(/\/[^/]*$/, '');
 }
 

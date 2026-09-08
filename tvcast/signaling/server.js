@@ -141,6 +141,15 @@ function serveFile(res, filePath, extraHeaders = {}) {
       return res.end('Not found');
     }
     const ext = path.extname(filePath).toLowerCase();
+
+    // Tell the page where it is mounted, so client code never has to infer
+    // the base path from location.pathname (which is ambiguous for /mount
+    // vs /mount/ and for /mount/j/CODE).
+    if (ext === '.html') {
+      const inject = `<script>window.PANELCAST_BASE=${JSON.stringify(BASE_PATH)};</script>`;
+      buf = Buffer.from(buf.toString('utf8').replace('</head>', `${inject}\n</head>`), 'utf8');
+    }
+
     res.writeHead(200, {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Content-Length': buf.length,
@@ -185,6 +194,15 @@ const httpServer = http.createServer((req, res) => {
   if (m) return serveFile(res, path.join(WEB_ROOT, 'phone.html'));
   m = pathname.match(/^\/pc\/([A-Za-z0-9]{4,12})\/?$/);
   if (m) return serveFile(res, path.join(WEB_ROOT, 'pc.html'));
+
+  // Redirect the bare mount to a trailing slash. Without this, relative asset
+  // paths on the landing page resolve one level too high (/panelcast ->
+  // /css/app.css instead of /panelcast/css/app.css), so the page loads
+  // unstyled and navigation targets the wrong path.
+  if (BASE_PATH && (pathname === '/' || pathname === '') && !url.pathname.endsWith('/')) {
+    res.writeHead(301, { Location: `${BASE_PATH}/${url.search || ''}` });
+    return res.end();
+  }
 
   if (pathname === '/' || pathname === '') pathname = '/index.html';
 
