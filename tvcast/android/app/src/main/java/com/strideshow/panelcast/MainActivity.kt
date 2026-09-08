@@ -10,6 +10,7 @@ import android.os.Looper
 import android.text.format.Formatter
 import android.util.Log
 import android.view.KeyEvent
+import android.view.SurfaceHolder
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
@@ -43,6 +44,8 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     /** Incremented only when the GL renderer has actually drawn a frame. */
     private var glPaintCount = 0
     private var statsTimer: Runnable? = null
+    /** True between surfaceCreated and surfaceDestroyed on the video view. */
+    private var surfaceReady = false
     private var currentRoom: String? = null
     private var lastJoinUrl: String? = null
 
@@ -57,6 +60,24 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         goImmersive()
 
         eglBase = EglBase.create()
+
+        // Watch the Surface lifecycle directly. EglRenderer silently discards
+        // frames ("Dropping frame - No surface") when no Surface exists, which
+        // is invisible from the app side unless we track it ourselves.
+        binding.videoView.holder.addCallback(object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                surfaceReady = true
+                Log.i(TAG, "video surface CREATED")
+            }
+            override fun surfaceChanged(holder: SurfaceHolder, f: Int, w: Int, h: Int) {
+                Log.i(TAG, "video surface changed ${w}x$h")
+            }
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                surfaceReady = false
+                Log.w(TAG, "video surface DESTROYED")
+            }
+        })
+
         setupRenderer()
 
         rtc = RtcReceiver(this, eglBase!!, this).also {
@@ -137,6 +158,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
                             st.bytesReceived / 1024,
                             st.codec.removePrefix("video/"),
                             st.decoder,
+                            if (surfaceReady) "surf✓" else "NO-SURFACE",
                         )
                         binding.txtDiag.visibility = View.VISIBLE
                         binding.txtDiag.text = line

@@ -15,12 +15,27 @@
     android:layout_height="match_parent"
     android:background="@color/tv_bg">
 
+    <!--
+      MUST start VISIBLE and stay visible for the whole session.
+
+      SurfaceViewRenderer is a SurfaceView: it only receives a Surface via
+      surfaceCreated() while it is VISIBLE and laid out. Declaring it GONE (or
+      INVISIBLE) here means no Surface is ever created, EGL has nothing to
+      attach to, and EglRenderer discards every frame with
+      "Dropping frame - No surface" - decoding fine, painting nothing.
+
+      No android:background either: a background on a SurfaceView is drawn in
+      the view hierarchy *above* the surface's own content on some ROMs, which
+      hides the video behind an opaque rectangle.
+
+      The lobby (declared later, opaque, match_parent) covers this view when
+      idle, so nothing here needs toggling.
+    -->
     <org.webrtc.SurfaceViewRenderer
         android:id="@+id/videoView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@android:color/black"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
     <TextView
         android:id="@+id/txtLiveHint"

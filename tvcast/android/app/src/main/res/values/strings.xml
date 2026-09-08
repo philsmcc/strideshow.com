@@ -32,7 +32,7 @@
     <!-- Live receive diagnostics: dec=frames decoded, drop=dropped,
          paint=frames actually drawn by GL. paint==0 with dec>0 means the
          decoder works but the surface is not rendering. -->
-    <string name="diag_stats">%1$d×%2$d · dec %3$d · drop %4$d · paint %5$d · %6$dKB · %7$s · %8$s</string>
+    <string name="diag_stats">%1$d×%2$d · dec %3$d · drop %4$d · paint %5$d · %6$dKB · %7$s · %8$s · %9$s</string>
 
     <!-- Settings -->
     <string name="settings_title">PanelCast Settings</string>
