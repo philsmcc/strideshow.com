@@ -166,46 +166,73 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
+            <!-- Step 2: the address. Must be prominent - this is what someone
+                 across the room actually has to read and type. -->
             <TextView
-                android:id="@+id/txtCode"
+                android:id="@+id/txtVisitLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:fontFamily="monospace"
-                android:letterSpacing="0.14"
-                android:text="······"
-                android:textColor="@color/tv_fg"
-                android:textSize="66sp"
-                android:textStyle="bold"
+                android:layout_marginTop="14dp"
+                android:text="@string/lobby_step_visit"
+                android:textColor="@color/tv_muted"
+                android:textSize="17sp"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/txtCodeLabel"
-                tools:text="ABC 123" />
+                app:layout_constraintTop_toBottomOf="@id/txtCodeLabel" />
 
             <TextView
                 android:id="@+id/txtJoinHint"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:textColor="@color/tv_muted"
-                android:textSize="19sp"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/tv_fg"
+                android:textSize="27sp"
+                android:textStyle="bold"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/txtCode"
-                tools:text="Go to cast.example.com on your phone" />
+                app:layout_constraintTop_toBottomOf="@id/txtVisitLabel"
+                tools:text="www.strideshow.com/panelcast" />
+
+            <!-- Step 3: the code -->
+            <TextView
+                android:id="@+id/txtEnterLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/lobby_step_enter"
+                android:textColor="@color/tv_muted"
+                android:textSize="17sp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/txtJoinHint" />
+
+            <TextView
+                android:id="@+id/txtCode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.14"
+                android:text="······"
+                android:textColor="@color/tv_accent"
+                android:textSize="58sp"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/txtEnterLabel"
+                tools:text="ABC 123" />
 
             <TextView
                 android:id="@+id/txtServer"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="14dp"
                 android:ellipsize="middle"
                 android:singleLine="true"
                 android:textColor="@color/tv_dim"
                 android:textSize="14sp"
+                android:visibility="gone"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/txtJoinHint"
-                tools:text="wss://cast.example.com/ws" />
+                app:layout_constraintTop_toBottomOf="@id/txtCode"
+                tools:text="wss://example.com/ws" />
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- Status row -->

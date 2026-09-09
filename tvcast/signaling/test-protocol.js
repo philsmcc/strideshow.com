@@ -96,15 +96,18 @@ async function main() {
     const idx = await fetch(BASE + MOUNT + '/');
     ok('landing page served at mount root', idx.status === 200 && (await idx.text()).includes('PanelCast'));
 
-    const jr = await fetch(BASE + MOUNT + '/j/ABC123');
-    const jrText = await jr.text();
-    ok('<mount>/j/<code> serves phone page', jr.status === 200 && jrText.includes('phone as a camera'));
-    ok('phone page uses relative asset paths', jrText.includes('../css/app.css') && jrText.includes('../js/sender.js'));
-
-    const pr = await fetch(BASE + MOUNT + '/pc/ABC123');
-    const prText = await pr.text();
-    ok('<mount>/pc/<code> serves pc page', pr.status === 200 && prText.includes('Share your screen'));
-    ok('pc page uses relative asset paths', prText.includes('../css/app.css'));
+    // The canonical share link, plus the two legacy aliases, must all serve
+    // the unified page - old QR codes and typed links keep working.
+    for (const prefix of ['s', 'j', 'pc']) {
+      const r = await fetch(`${BASE}${MOUNT}/${prefix}/ABC123`);
+      const body = await r.text();
+      ok(`<mount>/${prefix}/<code> serves the share page`,
+         r.status === 200 && body.includes('Share to the display'), `status ${r.status}`);
+      ok(`/${prefix}/ page uses relative asset paths`,
+         body.includes('../css/app.css') && body.includes('../js/sender.js'));
+      ok(`/${prefix}/ page offers both camera and screen`,
+         body.includes('pickCamera') && body.includes('pickScreen'));
+    }
 
     // Assets resolve where the relative paths point.
     const css = await fetch(BASE + MOUNT + '/css/app.css');
@@ -128,7 +131,7 @@ async function main() {
 
     // Regression: every HTML page must carry the authoritative base path so
     // clients never infer it from an ambiguous location.pathname.
-    for (const p of ['/', '/j/ABC123', '/pc/ABC123']) {
+    for (const p of ['/', '/s/ABC123', '/j/ABC123', '/pc/ABC123']) {
       const body = await (await fetch(BASE + MOUNT + p)).text();
       ok(`base path injected into ${p}`,
          body.includes(`window.PANELCAST_BASE=${JSON.stringify(MOUNT)}`), p);
@@ -151,10 +154,10 @@ async function main() {
     ok('host receives hosted', hosted.type === 'hosted');
     ok('room code is 6 chars', /^[A-Z0-9]{6}$/.test(hosted.room || ''), hosted.room);
     ok('no ambiguous chars in code', !/[01OIL]/.test(hosted.room || ''), hosted.room);
-    ok('joinUrl uses public base incl. mount',
-       hosted.joinUrl === `https://example.test${MOUNT}/j/${hosted.room}`, hosted.joinUrl);
-    ok('pcUrl uses public base incl. mount',
-       hosted.pcUrl === `https://example.test${MOUNT}/pc/${hosted.room}`, hosted.pcUrl);
+    ok('joinUrl is the unified /s/ link',
+       hosted.joinUrl === `https://example.test${MOUNT}/s/${hosted.room}`, hosted.joinUrl);
+    ok('QR url contains the mount path (regression: path was dropped)',
+       hosted.joinUrl.includes(`${MOUNT}/s/`), hosted.joinUrl);
     ok('iceServers sent to host', Array.isArray(hosted.iceServers) && hosted.iceServers.length > 0);
 
     const code = hosted.room;

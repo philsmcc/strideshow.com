@@ -14,7 +14,7 @@
   </header>
 
   <h1>Send something to the display</h1>
-  <p class="lead">Enter the code shown on the display, then choose what to share.</p>
+  <p class="lead">Enter the code shown on the display. You'll choose what to share next.</p>
 
   <div class="card">
     <label class="field">
@@ -22,16 +22,13 @@
       <input type="text" id="roomInput" inputmode="latin" autocapitalize="characters"
              autocomplete="off" spellcheck="false" maxlength="6" placeholder="ABC123">
     </label>
-    <div class="row">
-      <button id="goPhone">Phone camera</button>
-      <button class="secondary" id="goPc">Computer screen</button>
-    </div>
+    <button id="goShare">Continue</button>
     <div class="status" id="status"></div>
   </div>
 
   <p class="hint">
-    <b>Phone camera</b> turns this device into a live viewer or document camera.<br>
-    <b>Computer screen</b> shares a window, tab, or your whole desktop.
+    You can send this phone's camera (as a live view or document camera), or
+    share a window or screen from a computer.
   </p>
 
   <footer class="foot">Nothing is recorded. Video goes straight to the display.</footer>
@@ -45,30 +42,24 @@ input.addEventListener('input', function (e) {
   e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 });
 
-function go(prefix) {
+function go() {
   var code = input.value.trim().toUpperCase();
   if (code.length < 4) {
     status.textContent = 'Enter the code from the display.';
     status.className = 'status err';
     return;
   }
-  // Build the target relative to the *directory* we are in.
-  //
-  // Careful: /panelcast (no trailing slash) and /panelcast/ are both valid
-  // entry points but have different "directories". Stripping the last
-  // segment from /panelcast yields "", which sent users to /pc/CODE and
-  // 404'd. Trust the server-supplied base path instead, falling back to a
-  // trailing-slash-aware computation.
+  // Use the server-supplied base path; inferring it from location.pathname is
+  // ambiguous for /panelcast vs /panelcast/ (see sender.js).
   var base = (window.PANELCAST_BASE !== undefined)
     ? window.PANELCAST_BASE
     : location.pathname.replace(/\/+$/, '');
-  location.href = base + '/' + prefix + '/' + code;
+  location.href = base + '/s/' + code;
 }
-document.getElementById('goPhone').onclick = function () { go('j'); };
-document.getElementById('goPc').onclick = function () { go('pc'); };
 
+document.getElementById('goShare').onclick = go;
 input.addEventListener('keydown', function (e) {
-  if (e.key === 'Enter') go('j');
+  if (e.key === 'Enter') go();
 });
 </script>
 </body>

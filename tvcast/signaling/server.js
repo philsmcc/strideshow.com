@@ -192,12 +192,18 @@ const httpServer = http.createServer((req, res) => {
     return res.end(JSON.stringify({ iceServers: ICE_SERVERS, basePath: BASE_PATH }));
   }
 
-  // Short join links used by the QR code: /j/ABC123 (phone camera)
-  // and /pc/ABC123 (desktop screen share).
-  let m = pathname.match(/^\/j\/([A-Za-z0-9]{4,12})\/?$/);
-  if (m) return serveFile(res, path.join(WEB_ROOT, 'phone.html'));
-  m = pathname.match(/^\/pc\/([A-Za-z0-9]{4,12})\/?$/);
-  if (m) return serveFile(res, path.join(WEB_ROOT, 'pc.html'));
+  // Join links. A single page now handles both camera and screen sharing and
+  // lets the user choose, which removes the "which page am I on?" confusion.
+  //
+  // /s/CODE  - the canonical link, encoded in the QR
+  // /j/CODE  - legacy camera link; still works, opens straight into camera
+  // /pc/CODE - legacy screen link; still works, opens straight into screen
+  //
+  // The legacy forms are kept because a QR code may already be on a screen
+  // somewhere, and because they are a genuinely useful shortcut.
+  if (/^\/(?:s|j|pc)\/[A-Za-z0-9]{4,12}\/?$/.test(pathname)) {
+    return serveFile(res, path.join(WEB_ROOT, 'share.html'));
+  }
 
   // Redirect the bare mount to a trailing slash. Without this, relative asset
   // paths on the landing page resolve one level too high (/panelcast ->
@@ -305,8 +311,11 @@ function onHost(ws) {
     type: 'hosted',
     room: code,
     // Everything the TV needs to render the QR code without hardcoding a URL.
-    joinUrl: `${PUBLIC_BASE}/j/${code}`,
-    pcUrl: `${PUBLIC_BASE}/pc/${code}`,
+    // Single URL for the QR code and for reading aloud. The page asks what
+    // the user wants to share, so one link covers both cases.
+    joinUrl: `${PUBLIC_BASE}/s/${code}`,
+    // Retained for older receivers that still show two separate hints.
+    pcUrl: `${PUBLIC_BASE}/s/${code}`,
     iceServers: ICE_SERVERS,
   });
   log(`room ${code} hosted by ${ws.ip}`);

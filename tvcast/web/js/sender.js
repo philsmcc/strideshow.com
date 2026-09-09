@@ -20,7 +20,7 @@ function detectBasePath() {
   if (typeof window.PANELCAST_BASE === 'string') return window.PANELCAST_BASE;
 
   // Fallbacks for opening a page directly during development.
-  const m = location.pathname.match(/^(.*?)\/(?:j|pc)\/[A-Za-z0-9]{4,12}\/?$/);
+  const m = location.pathname.match(/^(.*?)\/(?:s|j|pc)\/[A-Za-z0-9]{4,12}\/?$/);
   if (m) return m[1];
   return location.pathname.replace(/\/[^/]*$/, '');
 }
@@ -294,9 +294,9 @@ export function errorText(code) {
   }
 }
 
-/** Pull the room code out of <base>/j/CODE or <base>/pc/CODE, or ?room=. */
+/** Pull the room code out of <base>/s|j|pc/CODE, or the ?room= query. */
 export function roomFromLocation() {
-  const m = location.pathname.match(/\/(?:j|pc)\/([A-Za-z0-9]{4,12})/);
+  const m = location.pathname.match(/\/(?:s|j|pc)\/([A-Za-z0-9]{4,12})/);
   if (m) return m[1].toUpperCase();
   const q = new URLSearchParams(location.search).get('room');
   return q ? q.toUpperCase() : '';

@@ -3,11 +3,20 @@
     <string name="app_name">PanelCast</string>
 
     <!-- Lobby -->
-    <string name="lobby_title">Share to this display</string>
-    <string name="lobby_step_phone">Scan with your phone camera</string>
-    <string name="lobby_step_code">Or enter this code</string>
-    <string name="join_hint">Go to %1$s on your phone or computer</string>
-    <string name="qr_fallback">Enter the code below on your phone</string>
+    <string name="lobby_title">Share your screen or camera to this display</string>
+
+    <!--
+      Numbered so the two halves of the lobby read as alternatives rather than
+      as steps that must both be followed. The old copy ("Scan with your phone
+      camera" / "Or enter this code") left users unsure whether the code was
+      needed after scanning.
+    -->
+    <string name="lobby_step_phone">1 · Scan this with your phone</string>
+    <string name="lobby_step_code">Or, on a computer</string>
+    <string name="lobby_step_visit">2 · Go to</string>
+    <string name="lobby_step_enter">3 · Enter this code</string>
+    <string name="join_hint">%1$s</string>
+    <string name="qr_fallback">Use the address and code on the right</string>
 
     <!-- Status line -->
     <string name="status_connecting">Connecting to server…</string>

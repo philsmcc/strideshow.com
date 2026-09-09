@@ -203,3 +203,82 @@ footer.foot {
   text-align: center;
   line-height: 1.6;
 }
+
+/* ---------------------------------------------------------------------------
+   Mode picker: two large tap targets instead of a "which page am I on?"
+   guessing game. Sized generously because the common case is a phone held
+   one-handed after scanning a QR code.
+   --------------------------------------------------------------------------- */
+.picker { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.choice:active { background: var(--panel-2); }
+
+.choice-ico {
+  flex: 0 0 auto;
+  width: 48px; height: 48px;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: rgba(61, 139, 253, 0.14);
+  color: var(--accent);
+}
+.choice-txt { flex: 1 1 auto; min-width: 0; }
+.choice-txt b { display: block; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+.choice-txt em {
+  display: block;
+  font-style: normal;
+  font-size: 13.5px;
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.choice-arrow { flex: 0 0 auto; color: var(--muted); font-size: 26px; line-height: 1; }
+
+/* Header inside an options card, with a back affordance. */
+.opt-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.opt-title { font-size: 16px; font-weight: 650; }
+
+.linkish {
+  width: auto;
+  padding: 6px 10px 6px 0;
+  background: none;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+}
+.linkish:active { background: none; opacity: 0.7; }
+
+/* Collapsible advanced block */
+details#advanced { margin-bottom: 16px; }
+details#advanced > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 14px;
+  padding: 8px 0;
+  list-style: none;
+}
+details#advanced > summary::-webkit-details-marker { display: none; }
+details#advanced > summary::before { content: '▸ '; }
+details#advanced[open] > summary::before { content: '▾ '; }
+
+.hint { margin-top: 8px; }

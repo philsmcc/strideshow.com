@@ -39,6 +39,17 @@ is exactly what makes small print readable. 4K therefore defaults to 15fps
 and a much higher bitrate ceiling. It is a poor choice for video playback on
 Wi-Fi, where packet loss will make it look worse than 1080p.
 
+**One sender page, not two.** `share.html` handles both camera and screen
+sharing and asks which you want. Having separate `/j/` and `/pc/` pages meant
+a user who scanned the QR landed on the camera page with no obvious way to
+share a screen instead. The page also hides options the device cannot do -
+screen sharing does not appear on a phone, so there is no button that leads
+to an error.
+
+Routes: `/s/CODE` is canonical and what the QR encodes. `/j/CODE` and
+`/pc/CODE` still work and jump straight into camera or screen mode
+respectively, so older QR codes and typed links keep working.
+
 **Tuning for a slow display:** lower the **frame rate** first. For slides and
 documents, 15fps at 1080p looks far better than 30fps the decoder cannot keep
 up with, because fewer frames means more bits per frame. Drop resolution to

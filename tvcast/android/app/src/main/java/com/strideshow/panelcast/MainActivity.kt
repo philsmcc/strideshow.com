@@ -149,8 +149,12 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         binding.txtTitle.textSize = sp(0.037f)
         binding.txtQrLabel.textSize = sp(0.018f)
         binding.txtCodeLabel.textSize = sp(0.018f)
-        binding.txtCode.textSize = sp(0.061f)
-        binding.txtJoinHint.textSize = sp(0.018f)
+        binding.txtCode.textSize = sp(0.054f)
+        binding.txtVisitLabel.textSize = sp(0.016f)
+        binding.txtEnterLabel.textSize = sp(0.016f)
+        // The address is the thing people must read and type, so it is sized
+        // close to a heading rather than as a footnote.
+        binding.txtJoinHint.textSize = sp(0.025f)
         binding.txtStatus.textSize = sp(0.019f)
         binding.txtServer.textSize = sp(0.013f)
         binding.txtDiag.textSize = sp(0.013f)
@@ -324,6 +328,8 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     private fun startSignaling() {
         val url = prefs.signalingUrl
         binding.txtServer.text = url
+        // Raw wss:// URL is developer information, not user-facing.
+        binding.txtServer.visibility = if (prefs.showDiagnostics) View.VISIBLE else View.GONE
         signaling = SignalingClient(url, this).also { it.connect() }
     }
 
@@ -367,8 +373,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
             }
         }
 
-        val host = hostFromUrl(joinUrl)
-        binding.txtJoinHint.text = getString(R.string.join_hint, host)
+        binding.txtJoinHint.text = getString(R.string.join_hint, typeableUrl(joinUrl))
 
         // Report what this display can actually decode, so the sender's UI
         // only offers modes that will work here.
@@ -521,10 +526,23 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     private fun formatCode(code: String): String =
         if (code.length == 6) "${code.substring(0, 3)} ${code.substring(3)}" else code
 
-    private fun hostFromUrl(url: String): String =
+    /**
+     * Turn the join URL into something a person can type, WITHOUT losing the
+     * path.
+     *
+     * This previously returned only the host, so the lobby instructed users to
+     * visit "www.strideshow.com" - which serves the unrelated StrideShow site.
+     * The path is the part that actually matters, so it must be kept; only the
+     * scheme and the room code are dropped.
+     *
+     *   https://www.strideshow.com/panelcast/s/ABC123
+     *     -> www.strideshow.com/panelcast
+     */
+    private fun typeableUrl(url: String): String =
         try {
-            val noScheme = url.substringAfter("://")
-            noScheme.substringBefore("/")
+            url.substringAfter("://")
+                .removeSuffix("/")
+                .replace(Regex("/s/[A-Za-z0-9]{4,12}$"), "")
         } catch (_: Exception) { url }
 
     /** Show the panel's own IP; invaluable when debugging a dead network. */
