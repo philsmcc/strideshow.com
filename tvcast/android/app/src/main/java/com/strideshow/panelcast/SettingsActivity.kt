@@ -25,6 +25,18 @@ class SettingsActivity : AppCompatActivity() {
         binding.switchDiag.isChecked = prefs.showDiagnostics
         binding.txtDefault.text = getString(R.string.settings_default, BuildConfig.DEFAULT_SIGNALING_URL)
 
+        // Overscan stepper. Buttons rather than a slider because they are far
+        // easier to hit precisely with a TV remote's D-pad.
+        renderOverscan()
+        binding.btnOverscanDown.setOnClickListener {
+            prefs.overscanPercent = prefs.overscanPercent - 1
+            renderOverscan()
+        }
+        binding.btnOverscanUp.setOnClickListener {
+            prefs.overscanPercent = prefs.overscanPercent + 1
+            renderOverscan()
+        }
+
         binding.btnSave.setOnClickListener { save() }
         binding.btnReset.setOnClickListener {
             prefs.resetUrl()
@@ -36,6 +48,21 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.switchDiag.setOnCheckedChangeListener { _, checked ->
             prefs.showDiagnostics = checked
+        }
+    }
+
+    /** Show the current value and inset the guide box to match it live. */
+    private fun renderOverscan() {
+        val pct = prefs.overscanPercent
+        binding.txtOverscan.text = getString(R.string.settings_overscan_value, pct)
+
+        val w = resources.displayMetrics.widthPixels
+        val h = resources.displayMetrics.heightPixels
+        (binding.overscanPreview.layoutParams as? android.view.ViewGroup.MarginLayoutParams)?.let { lp ->
+            lp.leftMargin = w * pct / 100
+            lp.rightMargin = w * pct / 100
+            lp.topMargin = (12 * resources.displayMetrics.density).toInt() + (h * pct / 100)
+            binding.overscanPreview.layoutParams = lp
         }
     }
 

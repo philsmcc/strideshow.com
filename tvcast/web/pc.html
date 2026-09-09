@@ -36,6 +36,16 @@
     </label>
 
     <label class="field">
+      <span class="lbl">Resolution</span>
+      <div class="row">
+        <button class="secondary" id="btnRes1080">1080p</button>
+        <button class="secondary" id="btnRes720">720p</button>
+        <button class="secondary" id="btnRes540">540p</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Older displays often can't decode 1080p smoothly. If the picture stutters, choose 720p.</p>
+    </label>
+
+    <label class="field">
       <span class="lbl">Quality ceiling</span>
       <div class="slider-row">
         <input type="range" id="bitrate" min="2" max="16" step="1" value="10">
@@ -74,6 +84,7 @@ const statusEl = $('status'), noticeEl = $('notice');
 let sender = null;
 let stream = null;
 let mode = 'detail';   // 'detail' = text/slides, 'motion' = video
+let maxH = 1080;       // capture height ceiling
 
 const prefilled = roomFromLocation();
 if (prefilled) {
@@ -112,8 +123,24 @@ function selectMode(m) {
   syncBitrateLabel();
 }
 selectMode('detail');
+selectRes(1080);
 $('btnText').onclick   = () => selectMode('detail');
+selectRes(1080);
 $('btnMotion').onclick = () => selectMode('motion');
+
+function selectRes(h) {
+  maxH = h;
+  for (const [id, v] of [['btnRes1080', 1080], ['btnRes720', 720], ['btnRes540', 540]]) {
+    $(id).style.borderColor = (v === h) ? 'var(--accent)' : 'var(--line)';
+  }
+  // Lower resolutions need proportionally less bitrate; keep the default sane.
+  const suggested = h >= 1080 ? 10 : (h >= 720 ? 5 : 3);
+  $('bitrate').value = suggested;
+  syncBitrateLabel();
+}
+$('btnRes1080').onclick = () => selectRes(1080);
+$('btnRes720').onclick  = () => selectRes(720);
+$('btnRes540').onclick  = () => selectRes(540);
 
 function syncBitrateLabel() { $('bitrateVal').textContent = $('bitrate').value + ' Mbps'; }
 $('bitrate').oninput = syncBitrateLabel;
@@ -127,8 +154,8 @@ async function pickScreen() {
   return navigator.mediaDevices.getDisplayMedia({
     audio: false, // audio would need a second track and echoes in a room
     video: {
-      width:  { ideal: 1920, max: 1920 },
-      height: { ideal: 1080, max: 1080 },
+      width:  { max: Math.round(maxH * 16 / 9) },
+      height: { max: maxH },
       // 30fps for video, lower for slides: fewer frames means more bits per
       // frame, which is what keeps text crisp.
       frameRate: { ideal: mode === 'motion' ? 30 : 15, max: 30 },

@@ -25,6 +25,19 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(KEY_DIAG, false)
         set(value) = sp.edit().putBoolean(KEY_DIAG, value).apply()
 
+    /**
+     * Overscan compensation, in percent of screen size per edge (0-12).
+     *
+     * Many TVs - especially older sets and some HDMI sticks - crop the edges
+     * of the incoming signal ("overscan"), so the outer ~2-5% of the picture
+     * is physically off-screen. Nothing the app draws can fix that from
+     * inside, so we inset our own content by this amount. It has to be
+     * per-device and adjustable because the amount varies by TV.
+     */
+    var overscanPercent: Int
+        get() = sp.getInt(KEY_OVERSCAN, 0).coerceIn(0, MAX_OVERSCAN)
+        set(value) = sp.edit().putInt(KEY_OVERSCAN, value.coerceIn(0, MAX_OVERSCAN)).apply()
+
     fun resetUrl() = sp.edit().remove(KEY_URL).apply()
 
     /**
@@ -45,5 +58,7 @@ class Prefs(context: Context) {
     companion object {
         private const val KEY_URL = "signaling_url"
         private const val KEY_DIAG = "show_diagnostics"
+        private const val KEY_OVERSCAN = "overscan_percent"
+        const val MAX_OVERSCAN = 12
     }
 }

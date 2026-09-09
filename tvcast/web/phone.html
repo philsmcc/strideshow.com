@@ -28,6 +28,15 @@
     </label>
 
     <label class="field">
+      <span class="lbl">Quality</span>
+      <div class="row">
+        <button class="secondary" id="btnQHigh">1080p</button>
+        <button class="secondary" id="btnQMed">720p</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Choose 720p if the picture stutters on the display.</p>
+    </label>
+
+    <label class="field">
       <span class="lbl">Camera</span>
       <div class="row">
         <button class="secondary" id="btnRear">Rear camera</button>
@@ -72,7 +81,14 @@ let torchOn = false;
 
 // Phone camera: 1080p is the sweet spot. 4K would look better in theory but old
 // TV decoders top out at 1080p and the extra bitrate just causes drops.
-const CAM_BITRATE_KBPS = 6000;
+let camMaxH = 1080;
+function camBitrate() { return camMaxH >= 1080 ? 6000 : 3000; }
+
+function selectQuality(h) {
+  camMaxH = h;
+  $('btnQHigh').style.borderColor = h === 1080 ? 'var(--accent)' : 'var(--line)';
+  $('btnQMed').style.borderColor  = h === 720  ? 'var(--accent)' : 'var(--line)';
+}
 
 const prefilled = roomFromLocation();
 if (prefilled) {
@@ -106,6 +122,9 @@ function selectFacing(f) {
   $('btnFront').style.borderColor = f === 'user' ? 'var(--accent)' : 'var(--line)';
 }
 selectFacing('environment');
+selectQuality(1080);
+$('btnQHigh').onclick = () => selectQuality(1080);
+$('btnQMed').onclick  = () => selectQuality(720);
 $('btnRear').onclick  = () => selectFacing('environment');
 $('btnFront').onclick = () => selectFacing('user');
 
@@ -121,8 +140,8 @@ async function getCameraStream(facingMode) {
     audio: false,
     video: {
       facingMode: { ideal: facingMode },
-      width:  { ideal: 1920 },
-      height: { ideal: 1080 },
+      width:  { ideal: Math.round(camMaxH * 16 / 9) },
+      height: { ideal: camMaxH },
       frameRate: { ideal: 30, max: 30 },
     },
   };
@@ -168,7 +187,7 @@ $('btnStart').onclick = async () => {
     if (!s.width) return;
     $('statLine').textContent = `${s.width}×${s.height} · ${s.fps}fps · ${(s.kbps / 1000).toFixed(1)} Mbps`;
   };
-  await sender.connect(stream, CAM_BITRATE_KBPS);
+  await sender.connect(stream, camBitrate());
 };
 
 function onSenderState(state, detail) {

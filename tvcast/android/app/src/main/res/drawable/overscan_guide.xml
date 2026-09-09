@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Calibration guide. The user increases overscan compensation until this
+  entire dashed border is visible on their TV; at that point nothing the app
+  draws is being cropped.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#00000000" />
+    <stroke
+        android:width="3dp"
+        android:color="@color/tv_accent"
+        android:dashWidth="10dp"
+        android:dashGap="6dp" />
+    <corners android:radius="6dp" />
+</shape>

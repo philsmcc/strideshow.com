@@ -12,6 +12,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.SurfaceHolder
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -88,12 +89,64 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         binding.btnSettings.setOnClickListener { openSettings() }
         binding.btnRetry.setOnClickListener { restartSignaling() }
 
+        applyDisplayMetrics()
         showLobby()
         renderNetworkInfo()
         startSignaling()
     }
 
     // ---- renderer -----------------------------------------------------------
+
+    /**
+     * Apply overscan compensation by insetting our own content.
+     *
+     * Applied to BOTH the video surface and the lobby, so the QR code and the
+     * shared picture are equally safe from a cropping TV. Also scales the
+     * lobby's text with the screen's shortest side, because a TV panel and an
+     * HDMI stick can report very different densities for the same physical
+     * screen - which is why UI elements looked bigger on the stick.
+     */
+    private fun applyDisplayMetrics() {
+        val pct = prefs.overscanPercent
+        val w = resources.displayMetrics.widthPixels
+        val h = resources.displayMetrics.heightPixels
+        val insetX = w * pct / 100
+        val insetY = h * pct / 100
+
+        // Inset the video surface.
+        (binding.videoView.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
+            lp.setMargins(insetX, insetY, insetX, insetY)
+            binding.videoView.layoutParams = lp
+        }
+        // Inset the lobby by padding, preserving its own design padding.
+        val basePadX = (56 * resources.displayMetrics.density).toInt()
+        val basePadY = (40 * resources.displayMetrics.density).toInt()
+        binding.lobby.setPadding(basePadX + insetX, basePadY + insetY,
+                                 basePadX + insetX, basePadY + insetY)
+
+        // Density-independent text sizing: base everything on the shortest
+        // side in *pixels*, so the lobby looks the same on a 1080p panel and
+        // a 1080p stick regardless of the density each one reports.
+        val shortSide = minOf(w, h).toFloat()
+        fun sp(fraction: Float) = shortSide * fraction / resources.displayMetrics.scaledDensity
+
+        binding.txtBrand.textSize = sp(0.024f)
+        binding.txtTitle.textSize = sp(0.037f)
+        binding.txtQrLabel.textSize = sp(0.018f)
+        binding.txtCodeLabel.textSize = sp(0.018f)
+        binding.txtCode.textSize = sp(0.061f)
+        binding.txtJoinHint.textSize = sp(0.018f)
+        binding.txtStatus.textSize = sp(0.019f)
+        binding.txtServer.textSize = sp(0.013f)
+        binding.txtDiag.textSize = sp(0.013f)
+
+        // QR: size from the screen, not a fixed dp, so it stays scannable.
+        val qr = (shortSide * 0.30f).toInt()
+        binding.qrPlate.layoutParams = binding.qrPlate.layoutParams.apply {
+            width = qr; height = qr
+        }
+        Log.i(TAG, "display ${w}x$h density=${resources.displayMetrics.density} overscan=$pct% qr=$qr")
+    }
 
     private fun setupRenderer() {
         binding.videoView.apply {
@@ -473,6 +526,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     override fun onResume() {
         super.onResume()
         goImmersive()
+        applyDisplayMetrics()
         renderNetworkInfo()
         // Settings may have changed the server; reconnect if so.
         if (binding.txtServer.text != prefs.signalingUrl) restartSignaling()

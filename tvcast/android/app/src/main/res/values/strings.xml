@@ -39,6 +39,12 @@
     <string name="settings_url_label">Signaling server (wss:// or ws://)</string>
     <string name="settings_diag_label">Show diagnostics on the lobby screen</string>
     <string name="settings_default">Default: %1$s</string>
+    <string name="settings_overscan_label">Screen edge adjustment (overscan)</string>
+    <string name="settings_overscan_hint">If the edges of the picture are cut off by your TV, increase this until the dashed box below is fully visible.</string>
+    <string name="settings_overscan_guide">The whole dashed border should be visible</string>
+    <string name="settings_minus">−</string>
+    <string name="settings_plus">+</string>
+    <string name="settings_overscan_value">%1$d%%</string>
     <string name="settings_save">Save</string>
     <string name="settings_reset">Reset to default</string>
     <string name="settings_back">Back</string>
