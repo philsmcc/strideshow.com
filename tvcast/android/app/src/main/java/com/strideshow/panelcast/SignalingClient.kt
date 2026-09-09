@@ -200,6 +200,14 @@ class SignalingClient(
         send(JSONObject().put("type", "ice").put("candidate", candidate))
     }
 
+    /** Tell the server what this display can decode, for sender UI limits. */
+    fun sendCaps(maxHeight: Int, codecs: List<String>, model: String) {
+        send(JSONObject().put("type", "caps").put("caps", JSONObject()
+            .put("maxHeight", maxHeight)
+            .put("codecs", org.json.JSONArray(codecs))
+            .put("model", model)))
+    }
+
     /** Drop the current sender but keep hosting the room. */
     fun sendBye() {
         send(JSONObject().put("type", "bye"))

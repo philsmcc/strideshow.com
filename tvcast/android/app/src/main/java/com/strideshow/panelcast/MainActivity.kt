@@ -2,6 +2,7 @@ package com.strideshow.panelcast
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
@@ -57,6 +58,18 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         prefs = Prefs(this)
+
+        // Media playback routing: MODE_NORMAL with STREAM_MUSIC is what a TV
+        // expects. Without this some panels route WebRTC audio to the (absent)
+        // voice-call stream and play nothing.
+        try {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            am.mode = AudioManager.MODE_NORMAL
+            @Suppress("DEPRECATION")
+            am.isSpeakerphoneOn = false
+        } catch (t: Throwable) {
+            Log.w(TAG, "could not set audio mode: ${t.message}")
+        }
 
         // A wall panel must never sleep or dim while showing a pairing code.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -357,12 +370,18 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         val host = hostFromUrl(joinUrl)
         binding.txtJoinHint.text = getString(R.string.join_hint, host)
 
-        // Always show the decoder list on the lobby: it is the single most
-        // useful fact when video fails, and costs one small line of text.
+        // Report what this display can actually decode, so the sender's UI
+        // only offers modes that will work here.
         rtc?.let { r ->
             r.initFactory()
-            binding.txtDiag.visibility = View.VISIBLE
-            binding.txtDiag.text = getString(R.string.diag_decoders, r.decoderSummary)
+            val caps = CodecCaps.query()
+            signaling?.sendCaps(caps.maxHeight, r.decoderNames, Build.MODEL ?: "")
+            if (prefs.showDiagnostics) {
+                binding.txtDiag.visibility = View.VISIBLE
+                binding.txtDiag.text = getString(
+                    R.string.diag_decoders, r.decoderSummary, caps.maxHeight,
+                )
+            }
         }
         Log.i(TAG, "hosting room $room")
     }

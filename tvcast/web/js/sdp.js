@@ -69,6 +69,65 @@ export function setVideoBitrate(sdp, kbps) {
   return out.join('\r\n');
 }
 
+/**
+ * Ask Opus for stereo and a higher bitrate.
+ *
+ * Opus in WebRTC defaults to mono at a speech-oriented bitrate, because the
+ * common case is a voice call. For sharing a video or a music-bearing
+ * presentation to a TV that is the wrong default, and the only way to change
+ * it is via fmtp parameters in the SDP - there is no JS API for it.
+ */
+export function setOpusQuality(sdp, kbps, stereo) {
+  const lines = sdp.split(/\r\n|\n/);
+  const pt = (() => {
+    for (const l of lines) {
+      const m = l.match(/^a=rtpmap:(\d+)\s+opus\/48000/i);
+      if (m) return m[1];
+    }
+    return null;
+  })();
+  if (!pt) return sdp;
+
+  const wanted = {
+    stereo: stereo ? '1' : '0',
+    'sprop-stereo': stereo ? '1' : '0',
+    maxaveragebitrate: String(Math.round(kbps * 1000)),
+    // Full-band audio; without this Opus may cap at a narrower bandwidth.
+    maxplaybackrate: '48000',
+    useinbandfec: '1',
+  };
+
+  const out = [];
+  let patched = false;
+  for (const line of lines) {
+    const m = line.match(new RegExp(`^a=fmtp:${pt}\\s+(.*)$`));
+    if (m) {
+      // Merge with existing params rather than replacing: the browser may
+      // have set values we should not clobber (e.g. minptime).
+      const params = new Map();
+      for (const kv of m[1].split(';')) {
+        const [k, v] = kv.split('=');
+        if (k) params.set(k.trim(), (v || '').trim());
+      }
+      for (const [k, v] of Object.entries(wanted)) params.set(k, v);
+      out.push(`a=fmtp:${pt} ` + [...params].map(([k, v]) => (v ? `${k}=${v}` : k)).join(';'));
+      patched = true;
+    } else {
+      out.push(line);
+    }
+  }
+
+  // No fmtp line existed: add one right after the rtpmap.
+  if (!patched) {
+    const idx = out.findIndex((l) => l.startsWith(`a=rtpmap:${pt} `));
+    if (idx !== -1) {
+      out.splice(idx + 1, 0,
+        `a=fmtp:${pt} ` + Object.entries(wanted).map(([k, v]) => `${k}=${v}`).join(';'));
+    }
+  }
+  return out.join('\r\n');
+}
+
 // NOTE: there is deliberately no combined "tune the offer" helper any more.
 // The sender must NOT reorder codecs - the receiver's answer selects the
 // codec, because only the receiver knows which decoders it actually has.

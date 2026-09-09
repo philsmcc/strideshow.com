@@ -18,6 +18,27 @@ QR code and a 6-character pairing code. Then either:
   browser tab, or the whole desktop. Resolution (1080p/720p/540p), frame rate
   (30/15/8 fps) and a bitrate ceiling are all selectable.
 
+**Audio** is shared from the chosen tab/window (Chrome and Edge; not
+available for whole-screen capture on macOS). The receiver plays audio but
+**never captures** it - the APK requests no microphone permission at all, so
+there is no echo path and no privacy surface. Opus is negotiated in stereo at
+a configurable bitrate (default 128 kbps), because WebRTC's speech-oriented
+mono default sounds poor for video soundtracks.
+
+**Resolutions are gated by a capability handshake.** The receiver queries
+`MediaCodecList` for the largest size its *hardware* decoders accept and
+reports it through signaling; the sender then hides options the display
+cannot handle. This exists because offering 4K to a 1080p decoder produces a
+black screen - a failure this project has already debugged once. The server
+clamps the reported value (360-4320) and rejects `caps` from anyone who is
+not the room host.
+
+**4K is worth it for a document camera** and for static presentations: the
+subject does not move, so there is no motion to smear, and the extra detail
+is exactly what makes small print readable. 4K therefore defaults to 15fps
+and a much higher bitrate ceiling. It is a poor choice for video playback on
+Wi-Fi, where packet loss will make it look worse than 1080p.
+
 **Tuning for a slow display:** lower the **frame rate** first. For slides and
 documents, 15fps at 1080p looks far better than 30fps the decoder cannot keep
 up with, because fewer frames means more bits per frame. Drop resolution to

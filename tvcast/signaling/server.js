@@ -89,6 +89,10 @@ class Room {
     this.host = host;       // the TV socket
     this.sender = null;     // at most one active sender
     this.createdAt = Date.now();
+    // What the display can actually decode. Sent by the TV, forwarded to
+    // senders so their UI only offers modes the panel can handle - offering
+    // 4K to a 1080p decoder is how you get a black screen.
+    this.caps = null;
   }
 }
 
@@ -272,6 +276,7 @@ wss.on('connection', (ws, req) => {
 function handleMessage(ws, msg) {
   switch (msg.type) {
     case 'host': return onHost(ws);
+    case 'caps': return onCaps(ws, msg);
     case 'join': return onJoin(ws, msg);
     case 'offer':
     case 'answer':
@@ -307,6 +312,29 @@ function onHost(ws) {
   log(`room ${code} hosted by ${ws.ip}`);
 }
 
+/**
+ * TV reports its decode capabilities. Sanitised, because these values drive
+ * what a sender will try to transmit.
+ */
+function onCaps(ws, msg) {
+  const room = ws.role === 'host' && ws.room && rooms.get(ws.room);
+  if (!room) return send(ws, { type: 'error', code: 'not_host' });
+
+  const c = msg.caps || {};
+  const maxHeight = Number(c.maxHeight);
+  room.caps = {
+    maxHeight: Number.isFinite(maxHeight) ? Math.min(Math.max(maxHeight, 360), 4320) : 1080,
+    codecs: Array.isArray(c.codecs) ? c.codecs.slice(0, 8).map(String) : [],
+    model: typeof c.model === 'string' ? c.model.slice(0, 64) : '',
+  };
+  log(`room ${room.code}: caps maxHeight=${room.caps.maxHeight} codecs=${room.caps.codecs.join('/')}`);
+
+  // If a sender is already connected, let it know.
+  if (room.sender && room.sender.readyState === 1) {
+    send(room.sender, { type: 'caps', caps: room.caps });
+  }
+}
+
 /** Phone or desktop joins an existing room. */
 function onJoin(ws, msg) {
   if (ws.room) return send(ws, { type: 'error', code: 'already_in_room' });
@@ -333,7 +361,7 @@ function onJoin(ws, msg) {
   ws.role = role;
   ws.room = code;
 
-  send(ws, { type: 'joined', room: code, role, iceServers: ICE_SERVERS });
+  send(ws, { type: 'joined', room: code, role, iceServers: ICE_SERVERS, caps: room.caps });
   send(room.host, { type: 'peer-join', peerId: ws.id, role });
   log(`room ${code}: ${role} joined from ${ws.ip}`);
 }

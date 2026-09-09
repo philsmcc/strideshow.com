@@ -192,6 +192,44 @@ async function main() {
     const ice2 = await phone.next();
     ok('ice relayed host->sender', ice2.type === 'ice' && ice2.candidate.candidate === 'cand-from-tv');
 
+    // --- Capability handshake ---------------------------------------------
+    console.log('\nDecode capability relay');
+
+    // A sender must not be able to spoof what the display can decode.
+    phone.send({ type: 'caps', caps: { maxHeight: 4320 } });
+    const spoof = await phone.next();
+    ok('non-host cannot set caps', spoof.type === 'error' && spoof.code === 'not_host', JSON.stringify(spoof));
+
+    // Host sets caps; a live sender is notified immediately.
+    tv.send({ type: 'caps', caps: { maxHeight: 2160, codecs: ['H264', 'VP8'], model: 'TestStick' } });
+    const liveCaps = await phone.next();
+    ok('caps pushed to live sender',
+       liveCaps.type === 'caps' && liveCaps.caps.maxHeight === 2160, JSON.stringify(liveCaps));
+    ok('caps carry codec list',
+       Array.isArray(liveCaps.caps.codecs) && liveCaps.caps.codecs.includes('H264'));
+
+    // Absurd values must be clamped: these drive what a sender transmits.
+    tv.send({ type: 'caps', caps: { maxHeight: 99999, codecs: ['H264'] } });
+    const clamped = await phone.next();
+    ok('absurd maxHeight clamped to <=4320', clamped.caps.maxHeight <= 4320, String(clamped.caps.maxHeight));
+
+    tv.send({ type: 'caps', caps: { maxHeight: 1 } });
+    const floored = await phone.next();
+    ok('tiny maxHeight floored to >=360', floored.caps.maxHeight >= 360, String(floored.caps.maxHeight));
+
+    // Set a realistic value, then verify a NEW joiner receives it on join.
+    tv.send({ type: 'caps', caps: { maxHeight: 1080, codecs: ['H264'] } });
+    await phone.next();
+    phone.close();
+    await tv.next();                     // peer-leave
+
+    const phone2 = client();
+    await phone2.open();
+    phone2.send({ type: 'join', room: code, role: 'camera' });
+    const rejoin = await phone2.next();
+    ok('caps delivered in join reply', !!rejoin.caps && rejoin.caps.maxHeight === 1080,
+       JSON.stringify(rejoin.caps));
+    await tv.next();                     // peer-join
     // --- Occupancy --------------------------------------------------------
     console.log('\nOccupancy + error handling');
     const second = client();
@@ -220,7 +258,7 @@ async function main() {
 
     // --- Sender leaving frees the slot -----------------------------------
     console.log('\nSender churn');
-    phone.close();
+    phone2.close();
     const peerLeave = await tv.next();
     ok('host notified of peer-leave', peerLeave.type === 'peer-leave');
 

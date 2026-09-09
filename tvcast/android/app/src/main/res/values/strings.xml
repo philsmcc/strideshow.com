@@ -27,7 +27,7 @@
     <!-- Diagnostics -->
     <string name="diag_net">IP %1$s · %2$s · API %3$d</string>
     <string name="diag_ice">ICE: %1$s</string>
-    <string name="diag_decoders">Decoders: %1$s</string>
+    <string name="diag_decoders">Decoders: %1$s · max %2$dp</string>
     <string name="diag_video">Video %1$d×%2$d rot %3$d</string>
     <!-- Live receive diagnostics: dec=frames decoded, drop=dropped,
          paint=frames actually drawn by GL. paint==0 with dec>0 means the

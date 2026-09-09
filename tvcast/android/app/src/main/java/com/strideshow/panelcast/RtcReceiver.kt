@@ -58,8 +58,13 @@ class RtcReceiver(
      * without hardware support guarantees a black screen.
      */
     private var hasH264Decoder = false
+    private var audioModule: JavaAudioDeviceModule? = null
+    private var remoteAudioTrack: AudioTrack? = null
     /** Human-readable decoder list, shown on the lobby for diagnosis. */
     var decoderSummary: String = "?"
+        private set
+    /** Codec names for reporting to senders, e.g. [H264, VP8, VP9]. */
+    var decoderNames: List<String> = emptyList()
         private set
 
     fun initFactory() {
@@ -85,14 +90,34 @@ class RtcReceiver(
             SoftwareVideoDecoderFactory()
         }
 
-        // Video-only receiver: disable all audio I/O so we never touch
-        // AudioRecord/AudioTrack, which is a common crash source on panels.
+        // Playback enabled, capture permanently disabled.
+        //
+        // The panel needs to PLAY audio from the sender but must never RECORD:
+        // there is nothing to record, and AudioRecord initialisation is a known
+        // crash source on AOSP panel builds. Stereo output because desktop
+        // audio is usually stereo and downmixing loses the spatial mix.
         val adm = JavaAudioDeviceModule.builder(context)
             .setUseHardwareAcousticEchoCanceler(false)
             .setUseHardwareNoiseSuppressor(false)
+            .setUseStereoOutput(true)
+            .setAudioRecordErrorCallback(object : JavaAudioDeviceModule.AudioRecordErrorCallback {
+                override fun onWebRtcAudioRecordInitError(msg: String?) { Log.w(TAG, "audio record init: $msg") }
+                override fun onWebRtcAudioRecordStartError(
+                    code: JavaAudioDeviceModule.AudioRecordStartErrorCode?, msg: String?,
+                ) { Log.w(TAG, "audio record start: $msg") }
+                override fun onWebRtcAudioRecordError(msg: String?) { Log.w(TAG, "audio record: $msg") }
+            })
+            .setAudioTrackErrorCallback(object : JavaAudioDeviceModule.AudioTrackErrorCallback {
+                override fun onWebRtcAudioTrackInitError(msg: String?) { Log.e(TAG, "audio track init: $msg") }
+                override fun onWebRtcAudioTrackStartError(
+                    code: JavaAudioDeviceModule.AudioTrackStartErrorCode?, msg: String?,
+                ) { Log.e(TAG, "audio track start: $msg") }
+                override fun onWebRtcAudioTrackError(msg: String?) { Log.e(TAG, "audio track: $msg") }
+            })
             .createAudioDeviceModule()
-        adm.setSpeakerMute(true)
+        adm.setSpeakerMute(false)
         adm.setMicrophoneMute(true)
+        audioModule = adm
 
         // Log the decoders this device really has. Forcing H.264 without
         // checking this was the core mistake: this WebRTC build ships NO
@@ -103,7 +128,8 @@ class RtcReceiver(
             Log.i(TAG, "device decoders: " + codecs.joinToString(", ") { c ->
                 "${c.name}${if (c.params.isNotEmpty()) c.params else ""}"
             })
-            decoderSummary = codecs.map { it.name }.distinct().joinToString("/")
+            decoderNames = codecs.map { it.name }.distinct()
+            decoderSummary = decoderNames.joinToString("/")
             hasH264Decoder = codecs.any { it.name.equals("H264", ignoreCase = true) }
             if (!hasH264Decoder) {
                 Log.w(TAG, "NO H.264 decoder on this device - will negotiate VP8 instead")
@@ -183,8 +209,12 @@ class RtcReceiver(
                 if (track.kind() == MediaStreamTrack.VIDEO_TRACK_KIND) {
                     bindVideoTrack(track as VideoTrack)
                 } else if (track is AudioTrack) {
-                    // Video-only product decision: silence any audio track.
-                    track.setEnabled(false)
+                    remoteAudioTrack = track
+                    track.setEnabled(true)
+                    // WebRTC's own volume scale, 0-10. Leave at unity and let
+                    // the TV's own volume control do the work.
+                    try { track.setVolume(1.0) } catch (_: Exception) {}
+                    Log.i(TAG, "audio track bound")
                 }
             }
         }
@@ -215,7 +245,7 @@ class RtcReceiver(
     private fun createAnswer() {
         val constraints = MediaConstraints().apply {
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
-            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
         }
 
         pc?.createAnswer(object : SdpObserverAdapter() {
@@ -365,6 +395,7 @@ class RtcReceiver(
             renderer?.let { view -> try { track.removeSink(view) } catch (_: Exception) {} }
         }
         remoteVideoTrack = null
+        remoteAudioTrack = null
         firstFrameSeen = false
         pc?.let {
             try { it.close() } catch (_: Exception) {}
@@ -375,6 +406,8 @@ class RtcReceiver(
 
     fun release() {
         closePeer()
+        audioModule?.let { try { it.release() } catch (_: Exception) {} }
+        audioModule = null
         factory?.let {
             try { it.dispose() } catch (_: Exception) {}
         }

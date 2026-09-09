@@ -38,11 +38,21 @@
     <label class="field">
       <span class="lbl">Resolution</span>
       <div class="row">
+        <button class="secondary" id="btnRes2160">4K</button>
+        <button class="secondary" id="btnRes1440">1440p</button>
         <button class="secondary" id="btnRes1080">1080p</button>
         <button class="secondary" id="btnRes720">720p</button>
-        <button class="secondary" id="btnRes540">540p</button>
       </div>
-      <p class="hint" style="margin-top:8px">Older displays often can't decode 1080p smoothly. If the picture stutters, choose 720p.</p>
+      <p class="hint" style="margin-top:8px" id="resHint">Older displays often can't decode 1080p smoothly. If the picture stutters, choose 720p.</p>
+    </label>
+
+    <label class="field">
+      <span class="lbl">Audio</span>
+      <div class="row">
+        <button class="secondary" id="btnAudioOn">Share audio</button>
+        <button class="secondary" id="btnAudioOff">No audio</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Shares the audio from the tab or window you pick. Chrome and Edge only; not available for a whole-screen share on macOS.</p>
     </label>
 
     <label class="field">
@@ -62,6 +72,31 @@
         <span class="val" id="bitrateVal">10 Mbps</span>
       </div>
     </label>
+
+    <details id="advanced" style="margin-bottom:16px">
+      <summary style="cursor:pointer;color:var(--muted);font-size:14px;padding:6px 0">Advanced quality options</summary>
+
+      <label class="field" style="margin-top:14px">
+        <span class="lbl">Audio quality</span>
+        <div class="slider-row">
+          <input type="range" id="audioKbps" min="32" max="256" step="32" value="128">
+          <span class="val" id="audioKbpsVal">128 kbps</span>
+        </div>
+      </label>
+
+      <label class="field">
+        <span class="lbl">Stereo audio</span>
+        <div class="row">
+          <button class="secondary" id="btnStereoOn">Stereo</button>
+          <button class="secondary" id="btnStereoOff">Mono</button>
+        </div>
+      </label>
+
+      <div class="notice" id="advNotice" style="margin-bottom:0">
+        High settings need a fast, stable network. On Wi-Fi, 4K at a high
+        bitrate will often look worse than 1080p because packets are lost.
+      </div>
+    </details>
 
     <button id="btnStart">Choose what to share</button>
     <div class="status" id="status"></div>
@@ -96,6 +131,9 @@ let stream = null;
 let mode = 'detail';   // 'detail' = text/slides, 'motion' = video
 let maxH = 1080;       // capture height ceiling
 let maxFps = 30;       // capture framerate ceiling
+let wantAudio = true;  // share audio from the chosen source
+let stereo = true;
+let panelMaxH = 1080;  // what the display told us it can decode
 
 const prefilled = roomFromLocation();
 if (prefilled) {
@@ -135,10 +173,7 @@ function selectMode(m) {
   selectFps(m === 'detail' ? 15 : 30);
   syncBitrateLabel();
 }
-selectRes(1080);
-selectMode('detail');   // sets framerate too, so run after selectRes
-$('btnText').onclick   = () => selectRes(1080);
-selectMode('detail');   // sets framerate too, so run after selectRes
+$('btnText').onclick   = () => selectMode('detail');
 $('btnMotion').onclick = () => selectMode('motion');
 
 function selectFps(f) {
@@ -151,22 +186,79 @@ $('btnFps30').onclick = () => selectFps(30);
 $('btnFps15').onclick = () => selectFps(15);
 $('btnFps8').onclick  = () => selectFps(8);
 
+const RES = [['btnRes2160', 2160], ['btnRes1440', 1440], ['btnRes1080', 1080], ['btnRes720', 720]];
+
 function selectRes(h) {
   maxH = h;
-  for (const [id, v] of [['btnRes1080', 1080], ['btnRes720', 720], ['btnRes540', 540]]) {
+  for (const [id, v] of RES) {
     $(id).style.borderColor = (v === h) ? 'var(--accent)' : 'var(--line)';
   }
-  // Lower resolutions need proportionally less bitrate; keep the default sane.
-  const suggested = h >= 1080 ? 10 : (h >= 720 ? 5 : 3);
+  // Bitrate scales roughly with pixel count. These are ceilings, not targets;
+  // congestion control will use less when the network cannot sustain it.
+  const suggested = h >= 2160 ? 16 : (h >= 1440 ? 12 : (h >= 1080 ? 10 : 5));
+  $('bitrate').max = h >= 1440 ? 40 : 16;
   $('bitrate').value = suggested;
   syncBitrateLabel();
 }
-$('btnRes1080').onclick = () => selectRes(1080);
-$('btnRes720').onclick  = () => selectRes(720);
-$('btnRes540').onclick  = () => selectRes(540);
+for (const [id, v] of RES) $(id).onclick = () => selectRes(v);
+
+/**
+ * Hide resolutions the display cannot decode.
+ *
+ * This is the whole point of the capability handshake: offering 4K to a
+ * 1080p decoder produces a black screen, which this project has already
+ * debugged once and should never ship again.
+ */
+function applyPanelCaps(caps) {
+  if (!caps || !caps.maxHeight) return;
+  panelMaxH = caps.maxHeight;
+  let anyHidden = false;
+  for (const [id, v] of RES) {
+    const ok = v <= panelMaxH;
+    $(id).classList.toggle('hidden', !ok);
+    if (!ok) anyHidden = true;
+  }
+  // If the current pick is now impossible, fall back to the best allowed.
+  if (maxH > panelMaxH) {
+    const best = RES.map(([, v]) => v).filter((v) => v <= panelMaxH)[0] || 720;
+    selectRes(best);
+  }
+  $('resHint').textContent = anyHidden
+    ? `This display decodes up to ${panelMaxH}p, so higher options are hidden.`
+    : `This display decodes up to ${panelMaxH}p. Lower the frame rate before the resolution if it stutters.`;
+}
+
+function selectAudio(on) {
+  wantAudio = on;
+  $('btnAudioOn').style.borderColor  = on ? 'var(--accent)' : 'var(--line)';
+  $('btnAudioOff').style.borderColor = on ? 'var(--line)' : 'var(--accent)';
+}
+$('btnAudioOn').onclick  = () => selectAudio(true);
+$('btnAudioOff').onclick = () => selectAudio(false);
+
+function selectStereo(on) {
+  stereo = on;
+  $('btnStereoOn').style.borderColor  = on ? 'var(--accent)' : 'var(--line)';
+  $('btnStereoOff').style.borderColor = on ? 'var(--line)' : 'var(--accent)';
+}
+$('btnStereoOn').onclick  = () => selectStereo(true);
+$('btnStereoOff').onclick = () => selectStereo(false);
+
+$('audioKbps').oninput = () => {
+  $('audioKbpsVal').textContent = $('audioKbps').value + ' kbps';
+};
 
 function syncBitrateLabel() { $('bitrateVal').textContent = $('bitrate').value + ' Mbps'; }
 $('bitrate').oninput = syncBitrateLabel;
+
+// --- initial state -------------------------------------------------------
+// Must run AFTER all the selector functions and the RES table are declared:
+// `const` bindings are hoisted but not initialised, so calling selectRes()
+// before the declaration throws "Cannot access 'RES' before initialization".
+selectRes(1080);
+selectMode('detail');   // also sets the frame rate, so run after selectRes
+selectAudio(true);
+selectStereo(true);
 
 $('roomInput').addEventListener('input', (e) => {
   e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -175,7 +267,14 @@ $('roomInput').addEventListener('input', (e) => {
 
 async function pickScreen() {
   return navigator.mediaDevices.getDisplayMedia({
-    audio: false, // audio would need a second track and echoes in a room
+    // Audio from the shared tab/window. There is no echo risk here because
+    // the receiver never captures audio - it is playback-only.
+    audio: wantAudio ? {
+      echoCancellation: false,   // this is system audio, not a microphone
+      noiseSuppression: false,
+      autoGainControl: false,
+      channelCount: stereo ? 2 : 1,
+    } : false,
     video: {
       width:  { max: Math.round(maxH * 16 / 9) },
       height: { max: maxH },
@@ -215,11 +314,15 @@ $('btnStart').onclick = async () => {
 
   const kbps = parseInt($('bitrate').value, 10) * 1000;
   sender = new Sender({ room, role: 'screen', onState: onSenderState });
+  sender.onCaps = (caps) => applyPanelCaps(caps);
   sender.onStats = (s) => {
     if (!s.width) return;
     $('statLine').textContent = `${s.width}×${s.height} · ${s.fps}fps · ${(s.kbps / 1000).toFixed(1)} Mbps`;
   };
-  await sender.connect(stream, kbps, maxFps);
+  await sender.connect(stream, kbps, maxFps, {
+    audioKbps: parseInt($('audioKbps').value, 10),
+    stereo,
+  });
 
   // Apply the chosen hint after tracks are attached.
   const track = stream.getVideoTracks()[0];

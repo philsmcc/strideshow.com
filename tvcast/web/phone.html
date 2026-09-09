@@ -30,10 +30,11 @@
     <label class="field">
       <span class="lbl">Quality</span>
       <div class="row">
+        <button class="secondary" id="btnQ4k">4K</button>
         <button class="secondary" id="btnQHigh">1080p</button>
         <button class="secondary" id="btnQMed">720p</button>
       </div>
-      <p class="hint" style="margin-top:8px">Choose 720p if the picture stutters on the display.</p>
+      <p class="hint" style="margin-top:8px" id="qHint">4K is excellent for document camera use — fine print stays readable. Choose 720p if the picture stutters.</p>
     </label>
 
     <label class="field">
@@ -82,12 +83,46 @@ let torchOn = false;
 // Phone camera: 1080p is the sweet spot. 4K would look better in theory but old
 // TV decoders top out at 1080p and the extra bitrate just causes drops.
 let camMaxH = 1080;
-function camBitrate() { return camMaxH >= 1080 ? 6000 : 3000; }
+let panelMaxH = 1080;
+const CAM_RES = [['btnQ4k', 2160], ['btnQHigh', 1080], ['btnQMed', 720]];
+
+// 4K needs substantially more bitrate to be worth having; below that the
+// extra pixels just get smeared and 1080p would have looked better.
+function camBitrate() {
+  if (camMaxH >= 2160) return 14000;
+  return camMaxH >= 1080 ? 6000 : 3000;
+}
+
+/**
+ * A document camera is the one case where 4K genuinely pays off: the subject
+ * is static, so there is no motion to smear, and the extra detail is exactly
+ * what makes small print readable. Framerate matters far less than detail.
+ */
+function camFramerate() { return camMaxH >= 2160 ? 15 : 30; }
 
 function selectQuality(h) {
   camMaxH = h;
-  $('btnQHigh').style.borderColor = h === 1080 ? 'var(--accent)' : 'var(--line)';
-  $('btnQMed').style.borderColor  = h === 720  ? 'var(--accent)' : 'var(--line)';
+  for (const [id, v] of CAM_RES) {
+    $(id).style.borderColor = (v === h) ? 'var(--accent)' : 'var(--line)';
+  }
+}
+
+/** Hide options the display cannot decode (see pc.html for the rationale). */
+function applyPanelCaps(caps) {
+  if (!caps || !caps.maxHeight) return;
+  panelMaxH = caps.maxHeight;
+  let hid = false;
+  for (const [id, v] of CAM_RES) {
+    const ok = v <= panelMaxH;
+    $(id).classList.toggle('hidden', !ok);
+    if (!ok) hid = true;
+  }
+  if (camMaxH > panelMaxH) {
+    selectQuality(CAM_RES.map(([, v]) => v).filter((v) => v <= panelMaxH)[0] || 720);
+  }
+  if (hid) {
+    $('qHint').textContent = `This display decodes up to ${panelMaxH}p, so higher options are hidden.`;
+  }
 }
 
 const prefilled = roomFromLocation();
@@ -123,8 +158,7 @@ function selectFacing(f) {
 }
 selectFacing('environment');
 selectQuality(1080);
-$('btnQHigh').onclick = () => selectQuality(1080);
-$('btnQMed').onclick  = () => selectQuality(720);
+for (const [id, v] of CAM_RES) $(id).onclick = () => selectQuality(v);
 $('btnRear').onclick  = () => selectFacing('environment');
 $('btnFront').onclick = () => selectFacing('user');
 
@@ -142,7 +176,7 @@ async function getCameraStream(facingMode) {
       facingMode: { ideal: facingMode },
       width:  { ideal: Math.round(camMaxH * 16 / 9) },
       height: { ideal: camMaxH },
-      frameRate: { ideal: 30, max: 30 },
+      frameRate: { ideal: camFramerate(), max: camFramerate() },
     },
   };
   try {
@@ -183,12 +217,12 @@ $('btnStart').onclick = async () => {
   await keepAwake();
 
   sender = new Sender({ room, role: 'camera', onState: onSenderState });
+  sender.onCaps = (caps) => applyPanelCaps(caps);
   sender.onStats = (s) => {
     if (!s.width) return;
     $('statLine').textContent = `${s.width}×${s.height} · ${s.fps}fps · ${(s.kbps / 1000).toFixed(1)} Mbps`;
   };
-  // Camera stays at 30fps: motion in a live camera view needs the frames.
-  await sender.connect(stream, camBitrate(), 30);
+  await sender.connect(stream, camBitrate(), camFramerate());
 };
 
 function onSenderState(state, detail) {

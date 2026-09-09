@@ -6,7 +6,7 @@
  * Android side simpler (no renegotiation dance on a weak CPU).
  */
 
-import { setVideoBitrate } from './sdp.js';
+import { setVideoBitrate, setOpusQuality } from './sdp.js';
 
 /**
  * Derive the mount prefix from our own URL. The pages live at
@@ -49,12 +49,15 @@ export class Sender {
     this.pendingIce = [];
   }
 
-  async connect(stream, bitrateKbps, maxFramerate) {
+  async connect(stream, bitrateKbps, maxFramerate, opts = {}) {
     this.stream = stream;
     this.bitrateKbps = bitrateKbps;
     // Cap the encoder's framerate too, not just capture: a lower rate leaves
     // more bits per frame, which is what keeps text legible on a slow decoder.
     this.maxFramerate = maxFramerate || 30;
+    this.audioKbps = opts.audioKbps || 128;
+    this.stereo = opts.stereo !== false;
+    this.caps = null;
 
     // Pull ICE config before opening the socket so the PC is ready immediately.
     try {
@@ -95,7 +98,16 @@ export class Sender {
         if (Array.isArray(msg.iceServers) && msg.iceServers.length) {
           this.iceServers = msg.iceServers;
         }
+        if (msg.caps) {
+          this.caps = msg.caps;
+          this.onCaps && this.onCaps(msg.caps);
+        }
         await this._startOffer();
+        break;
+
+      case 'caps':
+        this.caps = msg.caps;
+        this.onCaps && this.onCaps(msg.caps);
         break;
 
       case 'answer':
@@ -150,11 +162,12 @@ export class Sender {
       }
     };
 
-    // Add tracks, then constrain the video sender.
+    // Add tracks, then constrain the senders.
     for (const track of this.stream.getTracks()) {
       this.pc.addTrack(track, this.stream);
     }
     this._tuneVideoSender();
+    this._tuneAudioSender();
 
     const offer = await this.pc.createOffer({
       offerToReceiveAudio: false,
@@ -166,6 +179,8 @@ export class Sender {
     // panels whose MediaCodec H.264 was unavailable, because this WebRTC
     // build has no software H.264 fallback.
     offer.sdp = setVideoBitrate(offer.sdp, this.bitrateKbps);
+    // Opus defaults to mono at speech bitrates; ask for stereo/full-band.
+    offer.sdp = setOpusQuality(offer.sdp, this.audioKbps, this.stereo !== false);
     await this.pc.setLocalDescription(offer);
 
     this._send({ type: 'offer', sdp: this.pc.localDescription.sdp });
@@ -199,6 +214,25 @@ export class Sender {
       params.degradationPreference = 'maintain-resolution';
     }
     sender.setParameters(params).catch(() => { /* older browsers: best effort */ });
+  }
+
+  /**
+   * Audio deserves its own ceiling. Music and video soundtracks need far more
+   * than the ~32kbps WebRTC defaults to for speech, and stereo matters when
+   * sharing a video or a music-bearing presentation.
+   */
+  _tuneAudioSender() {
+    const sender = this.pc.getSenders().find((s) => s.track && s.track.kind === 'audio');
+    if (!sender) return;
+    try {
+      const params = sender.getParameters();
+      if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+      params.encodings[0].maxBitrate = (this.audioKbps || 128) * 1000;
+      // Audio is tiny next to video; never let congestion control drop it.
+      params.encodings[0].priority = 'high';
+      params.encodings[0].networkPriority = 'high';
+      sender.setParameters(params).catch(() => {});
+    } catch (_) { /* best effort */ }
   }
 
   /** Report live bitrate/resolution so the user can see what they're sending. */
