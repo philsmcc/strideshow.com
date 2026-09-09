@@ -13,9 +13,15 @@ QR code and a 6-character pairing code. Then either:
 
 - **Phone camera** - scan the QR code, and the phone's camera appears
   fullscreen on the panel. Usable as a live viewer or a document camera
-  (torch, autofocus nudge, front/rear flip).
+  (torch, autofocus nudge, front/rear flip). Quality: 1080p or 720p.
 - **Computer screen** - open the join page on a laptop and share a window, a
-  browser tab, or the whole desktop.
+  browser tab, or the whole desktop. Resolution (1080p/720p/540p), frame rate
+  (30/15/8 fps) and a bitrate ceiling are all selectable.
+
+**Tuning for a slow display:** lower the **frame rate** first. For slides and
+documents, 15fps at 1080p looks far better than 30fps the decoder cannot keep
+up with, because fewer frames means more bits per frame. Drop resolution to
+720p only if that is not enough.
 
 Media flows peer-to-peer via WebRTC. The server only brokers the handshake and
 never sees video.
@@ -71,10 +77,17 @@ non-updatable System WebView with broken or missing WebRTC. Bundling
 `libwebrtc` (~20 MB) makes the app self-sufficient and, critically, lets us
 control the decoder.
 
-**H.264 is forced.** These SoCs only reliably *hardware* decode H.264. If
-WebRTC negotiates VP8 at 1080p, decoding falls to software and the panel
-drops to single-digit framerates. Both the sender and receiver reorder the
-SDP video m-line to put H.264 first, preferring `packetization-mode=1`.
+**H.264 is preferred only when the device actually has a decoder.** The
+original design forced H.264 everywhere, on the theory that it is the only
+codec these SoCs hardware-decode. That was a mistake: the bundled WebRTC
+build contains **no software H.264 decoder** (only libvpx VP8/VP9), so on a
+device whose MediaCodec H.264 is missing or fails to initialise there is no
+fallback at all and every frame is dropped.
+
+Now the receiver enumerates its real decoders at startup and only reorders
+the SDP when H.264 is genuinely present. The web senders never reorder codecs
+at all - the receiver's answer selects the codec, which is how WebRTC
+negotiation is supposed to work and cannot strand the display.
 
 **The TV is always the answerer.** The sender owns the media and creates the
 offer, so the panel never has to renegotiate - the operation most likely to
@@ -86,6 +99,30 @@ and documents we do the opposite: hold resolution and let framerate dip.
 
 **minSdk 21.** Android 5.0 and up, so Android 9 panels are well covered.
 Also the floor supported by the WebRTC prebuilt.
+
+**The video surface is always visible.** `SurfaceViewRenderer` is a
+`SurfaceView`, and a `SurfaceView` owns a `Surface` only while it is
+`VISIBLE` - `GONE` *and* `INVISIBLE` both destroy it, after which EGL has
+nothing to attach to and `EglRenderer` silently discards every frame
+("Dropping frame - No surface"). So the renderer is never toggled; the opaque
+lobby is simply drawn over it and hidden to reveal the video.
+
+Related trap: `RendererEvents.onFirstFrameRendered()` is misnamed. It fires
+from `updateFrameDimensionsAndReportEvents()` *before* the frame is drawn, so
+it means "a frame arrived", not "a frame was painted", and it fires at most
+once per renderer lifetime (the flag resets only in `init()`). Revealing the
+video is therefore driven by `framesDecoded` from `getStats`, which is
+per-session and works on reconnects.
+
+**Overscan is user-calibrated.** Many TVs crop the outer few percent of the
+signal. An app cannot detect or defeat this, so Settings exposes a 0-12%
+inset (applied to both the video and the lobby) with a dashed calibration
+box: turn it up until the whole border is visible.
+
+**Sizing is derived from pixels, not dp.** A panel and an HDMI stick can
+report very different densities for the same physical 1080p screen, so
+identical `dp` values render at different physical sizes. Lobby text and the
+QR code are sized as a fraction of the screen's shortest side in pixels.
 
 **Installs on both launcher types.** `LEANBACK_LAUNCHER` *and* normal
 `LAUNCHER` intents are registered, with leanback and touchscreen both marked

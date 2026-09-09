@@ -69,7 +69,7 @@ export function setVideoBitrate(sdp, kbps) {
   return out.join('\r\n');
 }
 
-/** Apply every tweak we want on an outgoing offer. */
-export function tuneOffer(sdp, kbps) {
-  return setVideoBitrate(preferH264(sdp), kbps);
-}
+// NOTE: there is deliberately no combined "tune the offer" helper any more.
+// The sender must NOT reorder codecs - the receiver's answer selects the
+// codec, because only the receiver knows which decoders it actually has.
+// preferH264 is retained for reference and for receivers that opt in.

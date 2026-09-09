@@ -187,7 +187,8 @@ $('btnStart').onclick = async () => {
     if (!s.width) return;
     $('statLine').textContent = `${s.width}×${s.height} · ${s.fps}fps · ${(s.kbps / 1000).toFixed(1)} Mbps`;
   };
-  await sender.connect(stream, camBitrate());
+  // Camera stays at 30fps: motion in a live camera view needs the frames.
+  await sender.connect(stream, camBitrate(), 30);
 };
 
 function onSenderState(state, detail) {

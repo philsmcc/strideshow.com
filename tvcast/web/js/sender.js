@@ -49,9 +49,12 @@ export class Sender {
     this.pendingIce = [];
   }
 
-  async connect(stream, bitrateKbps) {
+  async connect(stream, bitrateKbps, maxFramerate) {
     this.stream = stream;
     this.bitrateKbps = bitrateKbps;
+    // Cap the encoder's framerate too, not just capture: a lower rate leaves
+    // more bits per frame, which is what keeps text legible on a slow decoder.
+    this.maxFramerate = maxFramerate || 30;
 
     // Pull ICE config before opening the socket so the PC is ready immediately.
     try {
@@ -188,7 +191,7 @@ export class Sender {
     const params = sender.getParameters();
     if (!params.encodings || !params.encodings.length) params.encodings = [{}];
     params.encodings[0].maxBitrate = this.bitrateKbps * 1000;
-    params.encodings[0].maxFramerate = this.role === 'screen' ? 30 : 30;
+    params.encodings[0].maxFramerate = this.maxFramerate;
     // Never let the encoder shrink the picture to protect framerate - blurry
     // text is worse than occasional judder for our use cases.
     params.encodings[0].scaleResolutionDownBy = 1;

@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.strideshow.panelcast.databinding.ActivityMainBinding
 import org.json.JSONObject
 import org.webrtc.EglBase
+import org.webrtc.EglRenderer
 import org.webrtc.PeerConnection
 import org.webrtc.RendererCommon
 
@@ -45,6 +46,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     /** Incremented only when the GL renderer has actually drawn a frame. */
     private var glPaintCount = 0
     private var statsTimer: Runnable? = null
+    private var revealTimer: Runnable? = null
     /** True between surfaceCreated and surfaceDestroyed on the video view. */
     private var surfaceReady = false
     private var currentRoom: String? = null
@@ -84,7 +86,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         rtc = RtcReceiver(this, eglBase!!, this).also {
             it.attachRenderer(binding.videoView)
         }
-        installPaintCounter()
+        syncPaintCounter()
 
         binding.btnSettings.setOnClickListener { openSettings() }
         binding.btnRetry.setOnClickListener { restartSignaling() }
@@ -181,11 +183,30 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
      * counterpart to the misleadingly-named onFirstFrameRendered().
      * Sampled at 1/30 of frames to keep the bitmap copies cheap.
      */
-    private fun installPaintCounter() {
-        try {
-            binding.videoView.addFrameListener({ _ -> glPaintCount++ }, 1f / 30f)
-        } catch (t: Throwable) {
-            Log.w(TAG, "could not install paint counter: ${t.message}")
+    private val paintListener = EglRenderer.FrameListener { glPaintCount++ }
+    private var paintListenerInstalled = false
+
+    /**
+     * Install/remove the proof-of-paint counter.
+     *
+     * This is diagnostics-only and NOT free: EglRenderer.notifyCallbacks does
+     * a GPU readback into a Bitmap for every sampled frame, which is real
+     * overhead on the weak hardware this app targets. It was essential for
+     * finding the black-screen bug; now it is opt-in.
+     */
+    private fun syncPaintCounter() {
+        val want = prefs.showDiagnostics
+        if (want && !paintListenerInstalled) {
+            try {
+                // Sample sparsely (1 in 60) - we only need proof of life.
+                binding.videoView.addFrameListener(paintListener, 1f / 60f)
+                paintListenerInstalled = true
+            } catch (t: Throwable) {
+                Log.w(TAG, "could not install paint counter: ${t.message}")
+            }
+        } else if (!want && paintListenerInstalled) {
+            try { binding.videoView.removeFrameListener(paintListener) } catch (_: Exception) {}
+            paintListenerInstalled = false
         }
     }
 
@@ -225,6 +246,33 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         main.post(tick)
     }
 
+    /**
+     * Lightweight always-on poll whose only job is to reveal the video once
+     * frames are decoding. Needed because the renderer's first-frame callback
+     * fires at most once per renderer lifetime, so it cannot be relied on for
+     * the second and later sessions.
+     */
+    private fun startRevealPoll() {
+        stopRevealPoll()
+        val tick = object : Runnable {
+            override fun run() {
+                if (!isLive) {
+                    rtc?.pollStats { st ->
+                        if (st.framesDecoded > 0) main.post { if (!isLive) showLive() }
+                    }
+                    main.postDelayed(this, 1000)
+                }
+            }
+        }
+        revealTimer = tick
+        main.post(tick)
+    }
+
+    private fun stopRevealPoll() {
+        revealTimer?.let { main.removeCallbacks(it) }
+        revealTimer = null
+    }
+
     private fun stopStatsOverlay() {
         statsTimer?.let { main.removeCallbacks(it) }
         statsTimer = null
@@ -241,6 +289,10 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
             // was painted". Verified against the 125.6422.07 bytecode. Use it
             // only as a progress signal.
             Log.i(TAG, "frame reached renderer")
+            // Primary trigger when diagnostics (and therefore the stats poll)
+            // are off. Fires only once per renderer lifetime, so the poll
+            // fallback below still matters on reconnects.
+            main.post { if (!isLive) showLive() }
         }
 
         override fun onFrameResolutionChanged(width: Int, height: Int, rotation: Int) {
@@ -322,6 +374,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
 
     override fun onPeerLeave(peerId: String) {
         stopStatsOverlay()
+        stopRevealPoll()
         rtc?.closePeer()
         isLive = false
         showLobby()
@@ -333,9 +386,11 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         binding.txtStatus.text = getString(R.string.status_negotiating)
         glPaintCount = 0
         rtc?.acceptOffer(sdp)
-        // Always run diagnostics during a session: a black screen is far more
-        // costly than a small text overlay.
-        startStatsOverlay()
+        // Stats polling is for diagnosis only. Leaving a text overlay on a
+        // wall-mounted display permanently risks burn-in and distracts from
+        // the content, so it follows the diagnostics setting.
+        if (prefs.showDiagnostics) startStatsOverlay()
+        startRevealPoll()
     }
 
     override fun onIce(candidate: JSONObject) {
@@ -426,7 +481,9 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     }
 
     private fun showLive() {
+        if (isLive) return
         isLive = true
+        stopRevealPoll()
         // Just uncover the video view - it was already visible and rendering.
         binding.lobby.visibility = View.GONE
         goImmersive()
@@ -527,6 +584,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
         super.onResume()
         goImmersive()
         applyDisplayMetrics()
+        syncPaintCounter()
         renderNetworkInfo()
         // Settings may have changed the server; reconnect if so.
         if (binding.txtServer.text != prefs.signalingUrl) restartSignaling()
@@ -535,6 +593,7 @@ class MainActivity : AppCompatActivity(), SignalingClient.Listener, RtcReceiver.
     override fun onDestroy() {
         super.onDestroy()
         stopStatsOverlay()
+        stopRevealPoll()
         main.removeCallbacksAndMessages(null)
         signaling?.close()
         rtc?.release()

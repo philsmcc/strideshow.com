@@ -46,6 +46,16 @@
     </label>
 
     <label class="field">
+      <span class="lbl">Frame rate</span>
+      <div class="row">
+        <button class="secondary" id="btnFps30">30 fps</button>
+        <button class="secondary" id="btnFps15">15 fps</button>
+        <button class="secondary" id="btnFps8">8 fps</button>
+      </div>
+      <p class="hint" style="margin-top:8px">For slides and documents, fewer frames means more detail per frame. Lower this before lowering resolution.</p>
+    </label>
+
+    <label class="field">
       <span class="lbl">Quality ceiling</span>
       <div class="slider-row">
         <input type="range" id="bitrate" min="2" max="16" step="1" value="10">
@@ -85,6 +95,7 @@ let sender = null;
 let stream = null;
 let mode = 'detail';   // 'detail' = text/slides, 'motion' = video
 let maxH = 1080;       // capture height ceiling
+let maxFps = 30;       // capture framerate ceiling
 
 const prefilled = roomFromLocation();
 if (prefilled) {
@@ -120,13 +131,25 @@ function selectMode(m) {
   // Text needs bitrate for sharpness; video needs it for smoothness. Both
   // benefit, but text benefits from a higher default ceiling.
   $('bitrate').value = m === 'detail' ? 10 : 8;
+  // Slides do not need 30fps; video does.
+  selectFps(m === 'detail' ? 15 : 30);
   syncBitrateLabel();
 }
-selectMode('detail');
 selectRes(1080);
-$('btnText').onclick   = () => selectMode('detail');
-selectRes(1080);
+selectMode('detail');   // sets framerate too, so run after selectRes
+$('btnText').onclick   = () => selectRes(1080);
+selectMode('detail');   // sets framerate too, so run after selectRes
 $('btnMotion').onclick = () => selectMode('motion');
+
+function selectFps(f) {
+  maxFps = f;
+  for (const [id, v] of [['btnFps30', 30], ['btnFps15', 15], ['btnFps8', 8]]) {
+    $(id).style.borderColor = (v === f) ? 'var(--accent)' : 'var(--line)';
+  }
+}
+$('btnFps30').onclick = () => selectFps(30);
+$('btnFps15').onclick = () => selectFps(15);
+$('btnFps8').onclick  = () => selectFps(8);
 
 function selectRes(h) {
   maxH = h;
@@ -158,7 +181,7 @@ async function pickScreen() {
       height: { max: maxH },
       // 30fps for video, lower for slides: fewer frames means more bits per
       // frame, which is what keeps text crisp.
-      frameRate: { ideal: mode === 'motion' ? 30 : 15, max: 30 },
+      frameRate: { max: maxFps },
       cursor: 'always',
     },
   });
@@ -196,7 +219,7 @@ $('btnStart').onclick = async () => {
     if (!s.width) return;
     $('statLine').textContent = `${s.width}×${s.height} · ${s.fps}fps · ${(s.kbps / 1000).toFixed(1)} Mbps`;
   };
-  await sender.connect(stream, kbps);
+  await sender.connect(stream, kbps, maxFps);
 
   // Apply the chosen hint after tracks are attached.
   const track = stream.getVideoTracks()[0];
