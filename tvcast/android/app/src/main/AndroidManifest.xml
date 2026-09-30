@@ -61,26 +61,45 @@
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="24">
 
+        <!--
+          Router: picks the whiteboard (default) or the classic single-window
+          receiver per the on-device setting, then finishes. Owns both
+          launcher intents so the choice never needs a reinstall.
+        -->
         <activity
-            android:name=".MainActivity"
+            android:name=".LaunchActivity"
             android:exported="true"
-            android:launchMode="singleTask"
-            android:screenOrientation="landscape"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|navigation|uiMode|density|smallestScreenSize"
-            android:theme="@style/Theme.PanelCast">
-
+            android:theme="@style/Theme.PanelCast.Launch">
             <!-- Standard launcher: repurposed tablets / touch panels -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
             <!-- Leanback launcher: genuine Android TV home screens -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- The whiteboard: paper + ink + floating live-source windows. -->
+        <activity
+            android:name=".BoardActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|navigation|uiMode|density|smallestScreenSize"
+            android:windowSoftInputMode="adjustPan"
+            android:theme="@style/Theme.PanelCast" />
+
+        <!-- Classic: lobby + one fullscreen video, for the original weak panels. -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|navigation|uiMode|density|smallestScreenSize"
+            android:theme="@style/Theme.PanelCast" />
 
         <activity
             android:name=".SettingsActivity"

@@ -38,6 +38,24 @@ class Prefs(context: Context) {
         get() = sp.getInt(KEY_OVERSCAN, 0).coerceIn(0, MAX_OVERSCAN)
         set(value) = sp.edit().putInt(KEY_OVERSCAN, value.coerceIn(0, MAX_OVERSCAN)).apply()
 
+    /**
+     * Open the "Add a source" sheet automatically on launch. On by default
+     * so a fresh install shows its pairing code; a teacher who mostly uses
+     * the board as a plain whiteboard can turn it off.
+     */
+    var showAddSheetOnLaunch: Boolean
+        get() = sp.getBoolean(KEY_ADD_SHEET, true)
+        set(value) = sp.edit().putBoolean(KEY_ADD_SHEET, value).apply()
+
+    /**
+     * Launch the original single-window receiver ("classic") instead of the
+     * whiteboard. Kept for the old, weak panels this project started on,
+     * where a TextureView per source and an ink layer are too much.
+     */
+    var classicMode: Boolean
+        get() = sp.getBoolean(KEY_CLASSIC, false)
+        set(value) = sp.edit().putBoolean(KEY_CLASSIC, value).apply()
+
     fun resetUrl() = sp.edit().remove(KEY_URL).apply()
 
     /**
@@ -59,6 +77,8 @@ class Prefs(context: Context) {
         private const val KEY_URL = "signaling_url"
         private const val KEY_DIAG = "show_diagnostics"
         private const val KEY_OVERSCAN = "overscan_percent"
+        private const val KEY_ADD_SHEET = "show_add_sheet"
+        private const val KEY_CLASSIC = "classic_mode"
         const val MAX_OVERSCAN = 12
     }
 }

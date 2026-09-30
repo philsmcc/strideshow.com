@@ -166,14 +166,18 @@ async function main() {
     console.log('\nSender join + relay');
     const phone = client();
     await phone.open();
-    phone.send({ type: 'join', room: code, role: 'camera' });
+    phone.send({ type: 'join', room: code, role: 'camera', label: '  Doc   cam\u0007 ' });
 
     const joined = await phone.next();
     ok('sender receives joined', joined.type === 'joined' && joined.room === code);
     ok('sender gets iceServers', Array.isArray(joined.iceServers) && joined.iceServers.length > 0);
+    ok('sender learns its own peerId', typeof joined.peerId === 'string' && joined.peerId.length > 0);
 
     const peerJoin = await tv.next();
     ok('host notified of peer-join', peerJoin.type === 'peer-join' && peerJoin.role === 'camera');
+    ok('peer-join carries the peerId the sender was given', peerJoin.peerId === joined.peerId);
+    ok('label sanitised (control chars stripped, whitespace collapsed)',
+       peerJoin.label === 'Doc cam', JSON.stringify(peerJoin.label));
 
     // Offer -> TV
     phone.send({ type: 'offer', sdp: 'v=0-fake-offer' });
@@ -233,14 +237,91 @@ async function main() {
     ok('caps delivered in join reply', !!rejoin.caps && rejoin.caps.maxHeight === 1080,
        JSON.stringify(rejoin.caps));
     await tv.next();                     // peer-join
-    // --- Occupancy --------------------------------------------------------
-    console.log('\nOccupancy + error handling');
+    // --- Multiple simultaneous sources -----------------------------------
+    // The whiteboard shows every source in its own window, so a second
+    // joiner must be accepted and the host must be able to address each one.
+    console.log('\nMultiple sources + addressed relay');
     const second = client();
     await second.open();
-    second.send({ type: 'join', room: code, role: 'screen' });
-    const busy = await second.next();
-    ok('second sender rejected as busy', busy.type === 'error' && busy.code === 'busy', JSON.stringify(busy));
-    second.close();
+    second.send({ type: 'join', room: code, role: 'screen', label: 'Laptop' });
+    const secondJoined = await second.next();
+    ok('second source accepted alongside the first',
+       secondJoined.type === 'joined' && secondJoined.role === 'screen', JSON.stringify(secondJoined));
+    const secondJoin = await tv.next();
+    ok('host sees second peer-join with label',
+       secondJoin.type === 'peer-join' && secondJoin.label === 'Laptop' && secondJoin.peerId === secondJoined.peerId);
+
+    // Both sources offer; the host must see two distinct `from` ids.
+    phone2.send({ type: 'offer', sdp: 'offer-from-phone2' });
+    second.send({ type: 'offer', sdp: 'offer-from-laptop' });
+    const o1 = await tv.next();
+    const o2 = await tv.next();
+    const byFrom = Object.fromEntries([o1, o2].map((o) => [o.from, o.sdp]));
+    ok('offers from two sources both reach host with distinct from ids',
+       byFrom[rejoin.peerId] === 'offer-from-phone2' && byFrom[secondJoined.peerId] === 'offer-from-laptop',
+       JSON.stringify(byFrom));
+
+    // Host answers each by id; each answer must land on the right source.
+    tv.send({ type: 'answer', to: rejoin.peerId, sdp: 'answer-for-phone2' });
+    tv.send({ type: 'answer', to: secondJoined.peerId, sdp: 'answer-for-laptop' });
+    const a1 = await phone2.next();
+    const a2 = await second.next();
+    ok('addressed answer reaches the right source (1)', a1.type === 'answer' && a1.sdp === 'answer-for-phone2', JSON.stringify(a1));
+    ok('addressed answer reaches the right source (2)', a2.type === 'answer' && a2.sdp === 'answer-for-laptop', JSON.stringify(a2));
+    ok('routing field `to` is not leaked to the source', a1.to === undefined && a2.to === undefined);
+
+    // Un-addressed host message: legacy behaviour, goes to the newest source.
+    tv.send({ type: 'ice', candidate: { candidate: 'legacy-unaddressed' } });
+    const legacy = await second.next();
+    ok('un-addressed host relay goes to newest source (legacy receivers)',
+       legacy.type === 'ice' && legacy.candidate.candidate === 'legacy-unaddressed', JSON.stringify(legacy));
+
+    // Caps broadcast reaches every live source, not just the newest.
+    tv.send({ type: 'caps', caps: { maxHeight: 1440, codecs: ['H264'] } });
+    const c1 = await phone2.next();
+    const c2 = await second.next();
+    ok('caps broadcast to all sources', c1.caps.maxHeight === 1440 && c2.caps.maxHeight === 1440);
+
+    // Host to an unknown id must fail cleanly, not fall back to someone else.
+    tv.send({ type: 'answer', to: 'nobody', sdp: 'x' });
+    const noPeer = await tv.next();
+    ok('addressing an unknown source errors with no_peer', noPeer.type === 'error' && noPeer.code === 'no_peer', JSON.stringify(noPeer));
+
+    // Host removes ONE window; the other source must be untouched.
+    tv.send({ type: 'kick', peerId: secondJoined.peerId });
+    const kickedMsg = await second.next();
+    ok('kicked source told host_ended', kickedMsg.type === 'error' && kickedMsg.code === 'host_ended', JSON.stringify(kickedMsg));
+    const kickLeave = await tv.next();
+    ok('host notified which source left', kickLeave.type === 'peer-leave' && kickLeave.peerId === secondJoined.peerId);
+    tv.send({ type: 'ice', to: rejoin.peerId, candidate: { candidate: 'still-here' } });
+    const survivor = await phone2.next();
+    ok('remaining source unaffected by kick', survivor.type === 'ice' && survivor.candidate.candidate === 'still-here');
+
+    // A source cannot kick.
+    phone2.send({ type: 'kick', peerId: rejoin.peerId });
+    const notHost = await phone2.next();
+    ok('non-host cannot kick', notHost.type === 'error' && notHost.code === 'not_host');
+
+    // Room capacity: fill it and expect `busy` only at the cap.
+    const health0 = await (await fetch(BASE + MOUNT + '/healthz')).json();
+    ok('healthz reports source count and cap', health0.sources === 1 && Number.isInteger(health0.maxSources), JSON.stringify(health0));
+    const fillers = [];
+    for (let i = 1; i < health0.maxSources; i++) {
+      const f = client(); await f.open();
+      f.send({ type: 'join', room: code, role: 'camera' });
+      const j = await f.next();
+      if (j.type !== 'joined') ok(`filler ${i} joined`, false, JSON.stringify(j));
+      await tv.next(); // peer-join
+      fillers.push(f);
+    }
+    const overflow = client(); await overflow.open();
+    overflow.send({ type: 'join', room: code, role: 'camera' });
+    const busy = await overflow.next();
+    ok(`room refuses source #${health0.maxSources + 1} as busy`, busy.type === 'error' && busy.code === 'busy', JSON.stringify(busy));
+    overflow.close();
+    for (const f of fillers) { f.close(); await tv.next(); }
+
+    console.log('\nError handling');
 
     const wrong = client();
     await wrong.open();
@@ -272,11 +353,31 @@ async function main() {
     ok('slot freed for next sender', rejoined.type === 'joined' && rejoined.role === 'screen');
     await tv.next(); // consume peer-join
 
+    // --- Host "bye" with no target ends every source --------------------
+    console.log('\nHost bye-all');
+    const fourth = client();
+    await fourth.open();
+    fourth.send({ type: 'join', room: code, role: 'camera' });
+    await fourth.next(); await tv.next();
+    tv.send({ type: 'bye' });
+    const e3 = await third.next();
+    const e4 = await fourth.next();
+    ok('un-addressed host bye ends all sources',
+       e3.code === 'host_ended' && e4.code === 'host_ended', JSON.stringify([e3, e4]));
+    await tv.next(); await tv.next(); // two peer-leaves
+    const emptied = await (await fetch(BASE + MOUNT + '/healthz')).json();
+    ok('room empty after bye-all but still hosted', emptied.rooms === 1 && emptied.sources === 0, JSON.stringify(emptied));
+
     // --- Host disappearing tears down the room ---------------------------
     console.log('\nHost teardown');
+    const fifth = client();
+    await fifth.open();
+    fifth.send({ type: 'join', room: code, role: 'camera' });
+    await fifth.next(); await tv.next();
     tv.close();
-    const kicked = await third.next();
+    const kicked = await fifth.next();
     ok('sender told host is gone', kicked.type === 'error' && kicked.code === 'host_gone', JSON.stringify(kicked));
+    fifth.close();
 
     await sleep(200);
     const afterHealth = await (await fetch(BASE + MOUNT + '/healthz')).json();

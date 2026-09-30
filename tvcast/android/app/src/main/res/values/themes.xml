@@ -13,4 +13,11 @@
         <!-- No activity animations: they stutter badly on old panel GPUs. -->
         <item name="android:windowAnimationStyle">@null</item>
     </style>
+
+    <!-- Router activity: paints nothing and finishes immediately. -->
+    <style name="Theme.PanelCast.Launch" parent="Theme.PanelCast">
+        <item name="android:windowBackground">@color/tv_bg</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsTranslucent">false</item>
+    </style>
 </resources>

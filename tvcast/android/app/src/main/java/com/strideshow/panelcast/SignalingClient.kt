@@ -33,9 +33,17 @@ class SignalingClient(
         fun onHosted(room: String, joinUrl: String, pcUrl: String, iceServers: List<IceServer>)
         /** A sender joined; expect an offer next. */
         fun onPeerJoin(peerId: String, role: String)
+        /**
+         * Multi-source variant carrying the sender's chosen label. Default
+         * delegates to the two-argument form so the old receiver compiles.
+         */
+        fun onPeerJoin(peerId: String, role: String, label: String) = onPeerJoin(peerId, role)
         fun onPeerLeave(peerId: String)
         fun onOffer(sdp: String)
+        /** Multi-source variant: `from` identifies which source sent the offer. */
+        fun onOffer(from: String, sdp: String) = onOffer(sdp)
         fun onIce(candidate: JSONObject)
+        fun onIce(from: String, candidate: JSONObject) = onIce(candidate)
         /** Transport-level state, for the status line. */
         fun onConnectionState(state: State, detail: String?)
         fun onServerError(code: String)
@@ -123,16 +131,18 @@ class SignalingClient(
                 }
             }
             "peer-join" -> main.post {
-                listener.onPeerJoin(msg.optString("peerId"), msg.optString("role"))
+                listener.onPeerJoin(msg.optString("peerId"), msg.optString("role"), msg.optString("label"))
             }
             "peer-leave" -> main.post { listener.onPeerLeave(msg.optString("peerId")) }
             "offer" -> {
                 val sdp = msg.optString("sdp")
-                if (sdp.isNotEmpty()) main.post { listener.onOffer(sdp) }
+                val from = msg.optString("from")
+                if (sdp.isNotEmpty()) main.post { listener.onOffer(from, sdp) }
             }
             "ice" -> {
                 val c = msg.optJSONObject("candidate")
-                if (c != null) main.post { listener.onIce(c) }
+                val from = msg.optString("from")
+                if (c != null) main.post { listener.onIce(from, c) }
             }
             "error" -> {
                 val code = msg.optString("code")
@@ -198,6 +208,20 @@ class SignalingClient(
 
     fun sendIce(candidate: JSONObject) {
         send(JSONObject().put("type", "ice").put("candidate", candidate))
+    }
+
+    /** Addressed variants: `to` routes the reply to one specific source. */
+    fun sendAnswer(to: String, sdp: String) {
+        send(JSONObject().put("type", "answer").put("to", to).put("sdp", sdp))
+    }
+
+    fun sendIce(to: String, candidate: JSONObject) {
+        send(JSONObject().put("type", "ice").put("to", to).put("candidate", candidate))
+    }
+
+    /** Remove one source (closes its window on the board). */
+    fun sendKick(peerId: String) {
+        send(JSONObject().put("type", "kick").put("peerId", peerId))
     }
 
     /** Tell the server what this display can decode, for sender UI limits. */
