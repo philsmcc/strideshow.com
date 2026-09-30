@@ -60,6 +60,10 @@ export class Sender {
     this.maxFramerate = maxFramerate || 30;
     this.audioKbps = opts.audioKbps || 128;
     this.stereo = opts.stereo !== false;
+    // What to sacrifice when the encoder cannot keep up. 'maintain-resolution'
+    // drops frames (right for static slides); 'maintain-framerate' shrinks the
+    // picture (right for video); 'balanced' does a bit of both.
+    this.degradation = opts.degradation || 'maintain-resolution';
     this.caps = null;
 
     // Pull ICE config before opening the socket so the PC is ready immediately.
@@ -211,12 +215,11 @@ export class Sender {
     if (!params.encodings || !params.encodings.length) params.encodings = [{}];
     params.encodings[0].maxBitrate = this.bitrateKbps * 1000;
     params.encodings[0].maxFramerate = this.maxFramerate;
-    // Never let the encoder shrink the picture to protect framerate - blurry
-    // text is worse than occasional judder for our use cases.
     params.encodings[0].scaleResolutionDownBy = 1;
-    if ('degradationPreference' in params) {
-      params.degradationPreference = 'maintain-resolution';
-    }
+    // Chrome only honours degradationPreference set through setParameters
+    // (the field is not on getParameters' result in older builds), so assign
+    // unconditionally rather than checking `in params`.
+    params.degradationPreference = this.degradation;
     sender.setParameters(params).catch(() => { /* older browsers: best effort */ });
   }
 
@@ -250,6 +253,12 @@ export class Sender {
       let stats;
       try { stats = await this.pc.getStats(); } catch (_) { return; }
 
+      let rtt = 0;
+      stats.forEach((r) => {
+        if (r.type === 'candidate-pair' && r.state === 'succeeded' && r.currentRoundTripTime != null) {
+          rtt = Math.round(r.currentRoundTripTime * 1000);
+        }
+      });
       stats.forEach((r) => {
         if (r.type === 'outbound-rtp' && r.kind === 'video' && !r.isRemote) {
           const now = r.timestamp;
@@ -260,11 +269,31 @@ export class Sender {
           }
           lastBytes = bytes;
           lastTs = now;
+          // Capture rate vs encode rate vs send rate tells you WHERE frames
+          // are being lost. And qualityLimitationReason is the encoder's own
+          // verdict on why it is not delivering the requested quality:
+          //   'none'      - all good
+          //   'cpu'       - this computer cannot encode fast enough
+          //   'bandwidth' - congestion control is holding the bitrate down
+          //   'other'     - usually the capture source itself is slow
           this.onStats && this.onStats({
             kbps,
             width: r.frameWidth || 0,
             height: r.frameHeight || 0,
             fps: Math.round(r.framesPerSecond || 0),
+            limit: r.qualityLimitationReason || 'unknown',
+            // Cumulative seconds spent in each limitation state.
+            limitDur: r.qualityLimitationDurations || null,
+            encoder: r.encoderImplementation || '',
+            // Hardware encoders show as e.g. 'ExternalEncoder' / 'VideoToolbox'
+            // / 'MediaFoundation'; software as 'OpenH264', 'libvpx', 'libaom'.
+            hwEncoder: /External|VideoToolbox|MediaFoundation|NvEnc|VAAPI|QSV|MediaCodec/i.test(r.encoderImplementation || ''),
+            framesEncoded: r.framesEncoded || 0,
+            framesSent: r.framesSent || 0,
+            keyFrames: r.keyFramesEncoded || 0,
+            nacks: r.nackCount || 0,
+            plis: r.pliCount || 0,
+            rtt,
           });
         }
       });

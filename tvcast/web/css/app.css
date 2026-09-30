@@ -153,6 +153,14 @@ button.danger { background: var(--err); }
   gap: 8px;
   font-variant-numeric: tabular-nums;
 }
+/* Bottleneck readout, stacked under the stats pill. Amber: it is a warning. */
+.pill.diag {
+  top: calc(46px + env(safe-area-inset-top));
+  border-radius: 12px;
+  max-width: min(520px, calc(100vw - 24px));
+  color: #f4d38a;
+  line-height: 1.35;
+}
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
 .dot.live { background: var(--ok); }
 .dot.warn { background: var(--warn); }

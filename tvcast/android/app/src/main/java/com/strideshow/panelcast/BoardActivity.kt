@@ -254,8 +254,23 @@ class BoardActivity : AppCompatActivity(),
         val t = object : Runnable {
             override fun run() {
                 for ((id, s) in sessions) {
-                    s.pollStats { w, h, fps, kbps, codec ->
-                        main.post { windows.find(id)?.setInfo(if (w > 0) "${w}\u00d7$h ${fps.toInt()}fps ${kbps / 1000}Mb $codec" else null) }
+                    s.pollStats { st ->
+                        main.post {
+                            if (st.width <= 0) { windows.find(id)?.setInfo(null); return@post }
+                            // Flag the receive-side bottleneck, if any, in the badge:
+                            //   drop N  - decoder/render could not keep up (panel-side)
+                            //   loss N  - packets lost on the network
+                            //   jb Nms  - jitter buffering; high means erratic arrival
+                            val flags = buildString {
+                                if (st.droppedDelta > 0) append(" drop ${st.droppedDelta}")
+                                if (st.lostDelta > 0) append(" loss ${st.lostDelta}")
+                                if (st.jitterMs > 60) append(" jb ${st.jitterMs}ms")
+                                if (!st.hwDecoder) append(" SW-DECODE")
+                            }
+                            windows.find(id)?.setInfo(
+                                "${st.width}\u00d7${st.height} ${st.fps.toInt()}fps ${st.kbps / 1000}Mb ${st.codec}$flags",
+                            )
+                        }
                     }
                 }
                 main.postDelayed(this, 2000)

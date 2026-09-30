@@ -116,7 +116,9 @@
       <div class="row">
         <button class="secondary" id="btnText">Text &amp; slides</button>
         <button class="secondary" id="btnMotion">Video</button>
+        <button class="secondary" id="btnSmooth">Smooth</button>
       </div>
+      <p class="hint" id="modeHint"></p>
     </label>
 
     <label class="field">
@@ -145,6 +147,7 @@
       <label class="field" style="margin-top:14px">
         <span class="lbl">Frame rate</span>
         <div class="row">
+          <button class="secondary" id="btnFps60">60 fps</button>
           <button class="secondary" id="btnFps30">30 fps</button>
           <button class="secondary" id="btnFps15">15 fps</button>
           <button class="secondary" id="btnFps8">8 fps</button>
@@ -193,6 +196,8 @@
 <div class="stage" id="stage">
   <video id="preview" autoplay playsinline muted></video>
   <div class="pill"><span class="dot" id="dot"></span><span id="statLine">connecting</span></div>
+  <!-- Diagnostic line: names the bottleneck when quality is being limited. -->
+  <div class="pill diag hidden" id="diagLine"></div>
   <div class="overlay" id="liveBar">
     <button class="danger" id="btnStop">Stop</button>
     <button class="secondary" id="btnTorch">Light</button>
@@ -325,10 +330,11 @@ $('audioKbps').oninput = () => { $('audioKbpsVal').textContent = $('audioKbps').
 
 function selectFps(f) {
   maxFps = f;
-  for (const [id, v] of [['btnFps30', 30], ['btnFps15', 15], ['btnFps8', 8]]) {
+  for (const [id, v] of [['btnFps60', 60], ['btnFps30', 30], ['btnFps15', 15], ['btnFps8', 8]]) {
     $(id).style.borderColor = (v === f) ? 'var(--accent)' : 'var(--line)';
   }
 }
+$('btnFps60').onclick = () => selectFps(60);
 $('btnFps30').onclick = () => selectFps(30);
 $('btnFps15').onclick = () => selectFps(15);
 $('btnFps8').onclick  = () => selectFps(8);
@@ -345,14 +351,30 @@ function selectRes(h) {
 }
 for (const [id, v] of RES) $(id).onclick = () => selectRes(v);
 
+/**
+ * Three presets. What differs is what the encoder sacrifices under load:
+ *  detail  - contentHint 'detail', maintain-resolution: frames drop, text stays crisp
+ *  motion  - contentHint 'motion', maintain-framerate: picture shrinks, motion stays smooth
+ *  smooth  - contentHint 'motion', 'balanced', 60fps ceiling: for scrolling, cursor
+ *            movement, animations - the "screen share looks choppy" case.
+ */
+let degradation = 'maintain-resolution';
 function selectMode(m) {
-  shareMode = m;
-  $('btnText').style.borderColor   = m === 'detail' ? 'var(--accent)' : 'var(--line)';
-  $('btnMotion').style.borderColor = m === 'motion' ? 'var(--accent)' : 'var(--line)';
-  selectFps(m === 'detail' ? 15 : 30);
+  shareMode = m === 'detail' ? 'detail' : 'motion';
+  degradation = m === 'detail' ? 'maintain-resolution' : (m === 'motion' ? 'maintain-framerate' : 'balanced');
+  for (const [id, v] of [['btnText', 'detail'], ['btnMotion', 'motion'], ['btnSmooth', 'smooth']]) {
+    $(id).style.borderColor = v === m ? 'var(--accent)' : 'var(--line)';
+  }
+  selectFps(m === 'detail' ? 15 : (m === 'smooth' ? 60 : 30));
+  $('modeHint').textContent = {
+    detail: 'Sharpest text. Frame rate drops first if the connection struggles.',
+    motion: 'Steady motion for video playback. Resolution drops first.',
+    smooth: 'Up to 60fps for scrolling and animations. Uses the most bandwidth and CPU.',
+  }[m];
 }
 $('btnText').onclick   = () => selectMode('detail');
 $('btnMotion').onclick = () => selectMode('motion');
+$('btnSmooth').onclick = () => selectMode('smooth');
 
 function selectAudio(on) {
   wantAudio = on;
@@ -486,6 +508,7 @@ $('btnStartScreen').onclick = async () => {
   await sender.connect(stream, parseInt($('bitrate').value, 10) * 1000, maxFps, {
     audioKbps: parseInt($('audioKbps').value, 10),
     stereo,
+    degradation,
   });
 };
 
@@ -495,6 +518,24 @@ function wireSender() {
     if (!s.width) return;
     $('statLine').textContent =
       `${s.width}\u00d7${s.height} \u00b7 ${s.fps}fps \u00b7 ${(s.kbps / 1000).toFixed(1)} Mbps`;
+    // Name the bottleneck. This is the encoder's own report, not a guess.
+    const d = $('diagLine');
+    const why = {
+      cpu: 'Limited by this computer\u2019s CPU \u2014 ' + (s.hwEncoder ? 'hardware encoder busy' : 'software encoding (' + (s.encoder || '?') + '). Try 1080p or a lower frame rate.'),
+      bandwidth: 'Limited by the network \u2014 congestion control is holding the bitrate down' + (s.rtt ? ` (RTT ${s.rtt}ms)` : '') + '. Move closer to the Wi-Fi or lower the bitrate ceiling.',
+      other: 'Limited by the capture source \u2014 the shared window is not producing frames faster than this.',
+    }[s.limit];
+    if (why) {
+      d.textContent = why;
+      d.classList.remove('hidden');
+    } else if (s.plis > 2 || s.nacks > 50) {
+      d.textContent = `Packet loss on the link: ${s.nacks} retransmits, ${s.plis} keyframe requests` + (s.rtt ? ` \u00b7 RTT ${s.rtt}ms` : '');
+      d.classList.remove('hidden');
+    } else {
+      d.classList.add('hidden');
+    }
+    // Detail in the console for anyone digging deeper.
+    if (window.PANELCAST_DEBUG) console.log('[panelcast]', s);
   };
 }
 

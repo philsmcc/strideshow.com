@@ -158,11 +158,33 @@ class SourceSession(
         if (remoteSet) pc?.addIceCandidate(c) else synchronized(pendingIce) { pendingIce.add(c) }
     }
 
-    /** Receive-side stats for the window's info badge. */
-    fun pollStats(cb: (width: Int, height: Int, fps: Double, kbps: Int, codec: String) -> Unit) {
+    /**
+     * Receive-side stats for the window's info badge.
+     *
+     * The three counters that separate the possible bottlenecks:
+     *  - packetsLost rising      -> the network is dropping packets
+     *  - framesDropped rising    -> frames arrived but the DECODER could not
+     *                               keep up (or arrived too late to render)
+     *  - jitterBufferDelay high  -> arrival timing is erratic; the receiver
+     *                               is buffering to smooth it, adding latency
+     */
+    data class Stats(
+        val width: Int, val height: Int, val fps: Double, val kbps: Int, val codec: String,
+        val decoder: String,
+        /** Frames dropped by this receiver in the last poll interval. */
+        val droppedDelta: Long,
+        /** Packets lost on the network in the last poll interval. */
+        val lostDelta: Long,
+        /** Average jitter-buffer delay per frame, ms. */
+        val jitterMs: Int,
+        val hwDecoder: Boolean,
+    )
+
+    fun pollStats(cb: (Stats) -> Unit) {
         val peer = pc ?: return
         peer.getStats { report ->
             var w = 0; var h = 0; var fps = 0.0; var bytes = 0L; var codecId: String? = null
+            var dropped = 0L; var lost = 0L; var jbDelay = 0.0; var jbCount = 0L; var impl = "?"
             for (st in report.statsMap.values) {
                 if (st.type == "inbound-rtp" && st.members["kind"] == "video") {
                     val m = st.members
@@ -170,6 +192,11 @@ class SourceSession(
                     h = (m["frameHeight"] as? Number)?.toInt() ?: h
                     fps = (m["framesPerSecond"] as? Number)?.toDouble() ?: fps
                     bytes = (m["bytesReceived"] as? Number)?.toLong() ?: bytes
+                    dropped = (m["framesDropped"] as? Number)?.toLong() ?: dropped
+                    lost = (m["packetsLost"] as? Number)?.toLong() ?: lost
+                    jbDelay = (m["jitterBufferDelay"] as? Number)?.toDouble() ?: jbDelay
+                    jbCount = (m["jitterBufferEmittedCount"] as? Number)?.toLong() ?: jbCount
+                    impl = (m["decoderImplementation"] as? String) ?: impl
                     codecId = m["codecId"] as? String
                 }
             }
@@ -178,12 +205,23 @@ class SourceSession(
             val now = System.currentTimeMillis()
             var kbps = 0
             if (lastStatsAt > 0 && now > lastStatsAt) kbps = ((bytes - lastBytes) * 8 / (now - lastStatsAt)).toInt()
-            lastStatsAt = now; lastBytes = bytes
-            cb(w, h, fps, kbps, codec)
+            val droppedDelta = if (lastStatsAt > 0) dropped - lastDropped else 0L
+            val lostDelta = if (lastStatsAt > 0) lost - lastLost else 0L
+            val jitterMs = if (jbCount > lastJbCount) (((jbDelay - lastJbDelay) / (jbCount - lastJbCount)) * 1000).toInt() else 0
+            lastStatsAt = now; lastBytes = bytes; lastDropped = dropped; lastLost = lost
+            lastJbDelay = jbDelay; lastJbCount = jbCount
+            // libwebrtc names software decoders 'libvpx', 'FFmpeg', 'OpenH264';
+            // MediaCodec hardware decoders carry the SoC vendor's name.
+            val hw = !Regex("libvpx|ffmpeg|openh264|dav1d|libaom|unknown", RegexOption.IGNORE_CASE).containsMatchIn(impl)
+            cb(Stats(w, h, fps, kbps, codec, impl, droppedDelta, lostDelta, jitterMs, hw))
         }
     }
     private var lastStatsAt = 0L
     private var lastBytes = 0L
+    private var lastDropped = 0L
+    private var lastLost = 0L
+    private var lastJbDelay = 0.0
+    private var lastJbCount = 0L
 
     fun closePeer() {
         videoTrack?.let { t -> sink?.let { s -> try { t.removeSink(s) } catch (_: Exception) {} } }
