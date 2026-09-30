@@ -32,6 +32,16 @@ class AddSourceSheet(context: Context) : FrameLayout(context) {
     private val countText: TextView
     private val dm = resources.displayMetrics
     private val shortSide = minOf(dm.widthPixels, dm.heightPixels).toFloat()
+    private val longSide = maxOf(dm.widthPixels, dm.heightPixels).toFloat()
+    /** Card width: most of the screen, but never so wide the text runs off. */
+    private val cardW = (longSide * 0.72f).toInt()
+    private val cardPad = (shortSide * 0.035f).toInt()
+    /**
+     * QR size: was 34% of the short side, which on a 16:9 panel left the
+     * text column no room. Now a quarter of the card's width, so the
+     * instructions always get at least half the card.
+     */
+    private val qrSize = (cardW * 0.28f).toInt()
 
     var onDismiss: (() -> Unit)? = null
 
@@ -50,22 +60,21 @@ class AddSourceSheet(context: Context) : FrameLayout(context) {
                 cornerRadius = dp(24f); setColor(0xFF151B26.toInt()); setStroke(dp(1f).toInt(), 0x33FFFFFF)
             }
             elevation = dp(20f)
-            val pad = (shortSide * 0.035f).toInt()
-            setPadding(pad, pad, pad, pad)
+            setPadding(cardPad, cardPad, cardPad, cardPad)
             isClickable = true // swallow taps so they do not reach the scrim
         }
 
         // Left: QR on a white plate (QR needs a light quiet zone on a dark UI).
-        val qrSize = (shortSide * 0.34f).toInt()
         val plate = FrameLayout(context).apply {
             background = GradientDrawable().apply { cornerRadius = dp(16f); setColor(Color.WHITE) }
             val p = (qrSize * 0.06f).toInt(); setPadding(p, p, p, p)
         }
         qr = ImageView(context).apply { scaleType = ImageView.ScaleType.FIT_CENTER }
         plate.addView(qr, LayoutParams(qrSize, qrSize))
-        card.addView(plate)
+        card.addView(plate, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
-        // Right: instructions.
+        // Right: instructions. weight=1 so this column owns whatever width
+        // the QR does not, and text wraps inside it instead of clipping.
         val col = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding((shortSide * 0.04f).toInt(), 0, 0, 0)
@@ -74,20 +83,23 @@ class AddSourceSheet(context: Context) : FrameLayout(context) {
             text = t; textSize = size; setTextColor(color)
             if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
-        col.addView(text("Add a source", sp(0.036f), Color.WHITE, true))
+        col.addView(text("Add a source", sp(0.034f), Color.WHITE, true))
         col.addView(text("Scan with a phone to send its camera,\nor open the address on a computer to share a screen.", sp(0.018f), 0xFF93A1B5.toInt()).apply {
             setPadding(0, (shortSide * 0.012f).toInt(), 0, (shortSide * 0.03f).toInt())
         })
         col.addView(text("On a computer, go to", sp(0.016f), 0xFF93A1B5.toInt()))
-        urlText = text("\u2026", sp(0.026f), 0xFF4DA3FF.toInt(), true).apply {
+        urlText = text("\u2026", sp(0.024f), 0xFF4DA3FF.toInt(), true).apply {
             typeface = android.graphics.Typeface.MONOSPACE
             setPadding(0, 0, 0, (shortSide * 0.02f).toInt())
+            // Long addresses wrap rather than vanish off the card edge.
+            maxLines = 2
         }
         col.addView(urlText)
         col.addView(text("and enter this code", sp(0.016f), 0xFF93A1B5.toInt()))
-        codeText = text("\u00B7\u00B7\u00B7 \u00B7\u00B7\u00B7", sp(0.06f), Color.WHITE, true).apply {
+        codeText = text("\u00B7\u00B7\u00B7 \u00B7\u00B7\u00B7", sp(0.055f), Color.WHITE, true).apply {
             typeface = android.graphics.Typeface.MONOSPACE
             letterSpacing = 0.12f
+            maxLines = 1
         }
         col.addView(codeText)
         statusText = text("Connecting to server\u2026", sp(0.016f), 0xFF93A1B5.toInt()).apply {
@@ -106,9 +118,9 @@ class AddSourceSheet(context: Context) : FrameLayout(context) {
             }
             setOnClickListener { hide() }
         })
-        card.addView(col)
+        card.addView(col, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
 
-        addView(card, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        addView(card, LayoutParams(cardW, LayoutParams.WRAP_CONTENT, Gravity.CENTER))
         visibility = GONE
         alpha = 0f
     }
@@ -116,8 +128,7 @@ class AddSourceSheet(context: Context) : FrameLayout(context) {
     fun setRoom(code: String, joinUrl: String) {
         codeText.text = if (code.length == 6) "${code.substring(0, 3)} ${code.substring(3)}" else code
         urlText.text = joinUrl.substringAfter("://").removeSuffix("/").replace(Regex("/s/[A-Za-z0-9]{4,12}$"), "")
-        val size = (shortSide * 0.34f).toInt()
-        val bmp: Bitmap? = QrGen.encode(joinUrl, size)
+        val bmp: Bitmap? = QrGen.encode(joinUrl, qrSize)
         if (bmp != null) qr.setImageBitmap(bmp)
         statusText.text = "Ready \u2014 waiting for a connection"
     }
