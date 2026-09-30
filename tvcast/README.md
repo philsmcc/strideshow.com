@@ -1,5 +1,77 @@
 # PanelCast
 
+**A whiteboard for a big touch panel, with live phone cameras and screen
+shares as floating windows you can write over.**
+
+The panel boots straight into a dark, graph-paper whiteboard. Tap **+** to
+show a QR code and a 6-character code; each phone camera or computer screen
+that joins becomes its own window on the board. Windows are moved with one
+finger on their title strip, resized and rotated with a two-finger pinch,
+sent fullscreen or closed from the strip, and tiled with one button. Ink is
+drawn *over* the windows, so you can annotate a live document camera or a
+shared slide.
+
+## Whiteboard features (v1)
+
+Chosen after surveying the SMART iQ, Promethean ActivPanel and Newline
+Whiteboard apps; these are the features all three share.
+
+| Feature | Notes |
+|---|---|
+| Infinite canvas | Two-finger pinch pans and zooms; **Lock canvas** disables it (SMART-style) |
+| Pen, highlighter | 9 high-contrast colours, 5 widths; highlighter renders under ink |
+| Eraser | Object eraser; **palm/fist erase** works in any tool via touch size |
+| Laser pointer | Fading red trail, never saved |
+| Shapes | Line, arrow, rectangle, ellipse, triangle, optional fill |
+| Ink-to-shape | Toggle in the pen pop-over: rough sketches snap to clean shapes |
+| Text | Tap to place typed text |
+| Select | Marquee-select and drag objects; delete via eraser |
+| Undo / redo / clear | Per page, 200 steps |
+| Pages | Thumbnail strip; add, switch, long-press to delete |
+| Backgrounds | Graph paper, dot grid, ruled lines, Cartesian axes, music staff, plain |
+| Multi-user inking | Every finger is its own stroke: several people can write at once |
+| Autosave + export | Board saved to app storage on every edit; **Save** exports PNG to Pictures/PanelCast |
+| Live sources | Up to 8 per room (`PANELCAST_MAX_SOURCES`); windows named by the sender |
+
+The original single-window receiver is still available as **Classic mode**
+in Settings, for the weak panels this project started on.
+
+### Layout of the receiver
+
+```
+android/app/src/main/java/com/strideshow/panelcast/
+├── LaunchActivity.kt        routes to whiteboard or classic
+├── BoardActivity.kt         the whiteboard screen
+├── MainActivity.kt          classic lobby + fullscreen video
+└── board/
+    ├── BoardModel.kt        pure-Kotlin document: pages, strokes, shapes, undo
+    ├── InkGeometry.kt       simplification, shape recognition, palm detection
+    ├── BoardView.kt         paper + ink rendering, touch arbitration
+    ├── SourceWindow.kt      one floating live-video window
+    ├── SourceWindowLayer.kt window manager: drag/pinch/rotate/fullscreen/tile
+    ├── TextureViewRenderer.kt WebRTC sink on a TextureView (layerable, unlike SurfaceView)
+    ├── SourceSession.kt     one PeerConnection per source + shared RtcEngine
+    ├── Toolbar.kt           floating tool strip and pop-overs
+    ├── AddSourceSheet.kt    the "+" pairing card (QR + code)
+    ├── PageStrip.kt         page thumbnails
+    └── BoardStore.kt        autosave (atomic) and PNG export
+```
+
+**Why TextureView:** a `SurfaceView` is a hole punched in the window; it
+cannot be layered under ink, rotated or overlapped predictably. `TextureView`
+is a normal view, at the cost of one extra GPU composite per frame - fine on
+the newer hardware the whiteboard targets. Classic mode keeps SurfaceView.
+
+**Signaling protocol change:** a room now holds many sources. Every relayed
+message carries `from`; the host addresses replies with `to`. Un-addressed
+host replies go to the newest source so the classic receiver still works.
+New: `kick` (host closes one window), `label` on `join`, `maxSources` in
+`hosted`. `node signaling/test-protocol.js` runs 75 assertions.
+
+---
+
+## Original notes (classic mode)
+
 Screen sharing and phone-camera casting to old Android TV panels, over WebRTC.
 
 **This is a standalone test project.** It shares nothing with the StrideShow

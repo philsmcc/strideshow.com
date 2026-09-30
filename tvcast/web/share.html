@@ -30,6 +30,15 @@
     </label>
   </div>
 
+  <!-- Window name. The board can show several sources at once; a label on
+       each window is how a teacher tells "Sam's phone" from "Priya's phone". -->
+  <div class="card" id="labelCard">
+    <label class="field" style="margin-bottom:0">
+      <span class="lbl">Name for your window on the board <em style="color:var(--muted);font-style:normal">(optional)</em></span>
+      <input type="text" id="labelInput" autocomplete="nickname" maxlength="32" placeholder="e.g. Sam's phone, Group 3, Laptop">
+    </label>
+  </div>
+
   <!-- What to share. Only options this device can actually do are shown. -->
   <div class="picker" id="picker">
     <button class="choice" id="pickCamera">
@@ -238,6 +247,10 @@ $('roomInput').addEventListener('input', (e) => {
   $('codeChip').textContent = e.target.value.padEnd(6, '-');
 });
 function roomCode() { return $('roomInput').value.trim().toUpperCase(); }
+function sourceLabel() { return $('labelInput').value.trim(); }
+// Remember the name so a returning student does not retype it.
+try { $('labelInput').value = localStorage.getItem('panelcast.label') || ''; } catch (_) {}
+$('labelInput').addEventListener('change', () => { try { localStorage.setItem('panelcast.label', sourceLabel()); } catch (_) {} });
 
 // ---- which options to offer ----------------------------------------------
 $('pickCamera').classList.toggle('hidden', !canCamera);
@@ -425,7 +438,7 @@ $('btnStartCamera').onclick = async () => {
   goLive('camera');
   updateCameraControls();
   await keepAwake();
-  sender = new Sender({ room: roomCode(), role: 'camera', onState: onSenderState });
+  sender = new Sender({ room: roomCode(), role: 'camera', label: sourceLabel(), onState: onSenderState });
   wireSender();
   await sender.connect(stream, camBitrate(), camFramerate());
 };
@@ -468,7 +481,7 @@ $('btnStartScreen').onclick = async () => {
   const track = stream.getVideoTracks()[0];
   if ('contentHint' in track) track.contentHint = shareMode;
 
-  sender = new Sender({ room: roomCode(), role: 'screen', onState: onSenderState });
+  sender = new Sender({ room: roomCode(), role: 'screen', label: sourceLabel(), onState: onSenderState });
   wireSender();
   await sender.connect(stream, parseInt($('bitrate').value, 10) * 1000, maxFps, {
     audioKbps: parseInt($('audioKbps').value, 10),

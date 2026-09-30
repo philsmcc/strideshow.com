@@ -4,9 +4,16 @@
 /**
  * PanelCast signaling server.
  *
- * Rooms are ephemeral and in-memory. A "host" is an Android TV panel showing a
- * pairing code; a "sender" is a phone camera or a desktop screen share that
- * joins that code. The server only relays SDP/ICE - it never touches media.
+ * Rooms are ephemeral and in-memory. A "host" is an Android panel running the
+ * whiteboard; a "source" is a phone camera or a desktop screen share that joins
+ * the panel's code. The server only relays SDP/ICE - it never touches media.
+ *
+ * A room holds MANY sources at once. Each source becomes its own floating
+ * window on the panel's whiteboard, so every relayed message carries the
+ * source's peer id and the host addresses replies to a specific source. The
+ * pre-whiteboard protocol (one sender, unaddressed replies) is still accepted:
+ * a host reply without a `to` field goes to the most recent source, which is
+ * exactly what the old single-sender receiver did implicitly.
  *
  * Deliberately has zero dependencies on the StrideShow app: own port, own
  * process, no database.
@@ -45,6 +52,10 @@ const ROOM_TTL_MS = 12 * 60 * 60 * 1000; // reclaim abandoned rooms after 12h
 const HEARTBEAT_MS = 25000;              // keep NAT/proxy paths alive
 const JOIN_FAIL_LIMIT = 20;              // per-IP wrong-code attempts...
 const JOIN_FAIL_WINDOW_MS = 5 * 60 * 1000; // ...within this window
+// Cap on live sources per room. A 4K panel decoding this many streams at once
+// is already generous; the limit exists to keep one room from monopolising a
+// classroom's Wi-Fi and to bound the receiver's decoder use.
+const MAX_SOURCES = parseInt(process.env.PANELCAST_MAX_SOURCES || '8', 10);
 
 /** @type {Map<string, Room>} */
 const rooms = new Map();
@@ -86,13 +97,26 @@ function peerId() {
 class Room {
   constructor(code, host) {
     this.code = code;
-    this.host = host;       // the TV socket
-    this.sender = null;     // at most one active sender
+    this.host = host;       // the panel's socket
+    /** @type {Map<string, import('ws').WebSocket>} live sources by peer id */
+    this.sources = new Map();
+    /** Most recently joined source; target for un-addressed host replies. */
+    this.lastSource = null;
     this.createdAt = Date.now();
-    // What the display can actually decode. Sent by the TV, forwarded to
-    // senders so their UI only offers modes the panel can handle - offering
+    // What the display can actually decode. Sent by the panel, forwarded to
+    // sources so their UI only offers modes the panel can handle - offering
     // 4K to a 1080p decoder is how you get a black screen.
     this.caps = null;
+  }
+
+  /** Sources whose socket is still open. */
+  liveSources() {
+    const out = [];
+    for (const [id, ws] of this.sources) {
+      if (ws.readyState === 1) out.push(ws);
+      else this.sources.delete(id);
+    }
+    return out;
   }
 }
 
@@ -177,10 +201,14 @@ const httpServer = http.createServer((req, res) => {
 
   // Health check for pm2 / uptime monitoring.
   if (pathname === '/healthz') {
+    let sources = 0;
+    for (const r of rooms.values()) sources += r.liveSources().length;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       ok: true,
       rooms: rooms.size,
+      sources,
+      maxSources: MAX_SOURCES,
       uptime: Math.round(process.uptime()),
     }));
   }
@@ -257,6 +285,7 @@ wss.on('connection', (ws, req) => {
   ws.ip = clientIp(req);
   ws.role = null;      // 'host' | 'camera' | 'screen'
   ws.room = null;
+  ws.label = '';       // user-chosen name shown on the source window
   ws.isAlive = true;
 
   ws.on('pong', () => { ws.isAlive = true; });
@@ -289,7 +318,9 @@ function handleMessage(ws, msg) {
     case 'ice':
       return onRelay(ws, msg);
     case 'bye':
-      return onBye(ws);
+      return onBye(ws, msg);
+    case 'kick':
+      return onKick(ws, msg);
     case 'ping':
       return send(ws, { type: 'pong' });
     default:
@@ -310,13 +341,14 @@ function onHost(ws) {
   send(ws, {
     type: 'hosted',
     room: code,
-    // Everything the TV needs to render the QR code without hardcoding a URL.
-    // Single URL for the QR code and for reading aloud. The page asks what
-    // the user wants to share, so one link covers both cases.
+    // Everything the panel needs to render the QR code without hardcoding a
+    // URL. Single URL for the QR code and for reading aloud. The page asks
+    // what the user wants to share, so one link covers both cases.
     joinUrl: `${PUBLIC_BASE}/s/${code}`,
     // Retained for older receivers that still show two separate hints.
     pcUrl: `${PUBLIC_BASE}/s/${code}`,
     iceServers: ICE_SERVERS,
+    maxSources: MAX_SOURCES,
   });
   log(`room ${code} hosted by ${ws.ip}`);
 }
@@ -338,10 +370,8 @@ function onCaps(ws, msg) {
   };
   log(`room ${room.code}: caps maxHeight=${room.caps.maxHeight} codecs=${room.caps.codecs.join('/')}`);
 
-  // If a sender is already connected, let it know.
-  if (room.sender && room.sender.readyState === 1) {
-    send(room.sender, { type: 'caps', caps: room.caps });
-  }
+  // Every connected source needs to know, not just the newest.
+  for (const src of room.liveSources()) send(src, { type: 'caps', caps: room.caps });
 }
 
 /** Phone or desktop joins an existing room. */
@@ -361,47 +391,97 @@ function onJoin(ws, msg) {
     noteJoinFailure(ws.ip);
     return send(ws, { type: 'error', code: 'no_room' });
   }
-  // One sender at a time keeps the TV's decode path simple and predictable.
-  if (room.sender && room.sender.readyState === 1) {
+  // The panel decodes one stream per window; refuse rather than degrade every
+  // window on screen when the room is full.
+  if (room.liveSources().length >= MAX_SOURCES) {
     return send(ws, { type: 'error', code: 'busy' });
   }
 
-  room.sender = ws;
+  room.sources.set(ws.id, ws);
+  room.lastSource = ws;
   ws.role = role;
   ws.room = code;
+  ws.label = sanitizeLabel(msg.label);
 
-  send(ws, { type: 'joined', room: code, role, iceServers: ICE_SERVERS, caps: room.caps });
-  send(room.host, { type: 'peer-join', peerId: ws.id, role });
-  log(`room ${code}: ${role} joined from ${ws.ip}`);
+  send(ws, {
+    type: 'joined', room: code, role, peerId: ws.id,
+    iceServers: ICE_SERVERS, caps: room.caps,
+  });
+  send(room.host, { type: 'peer-join', peerId: ws.id, role, label: ws.label });
+  log(`room ${code}: ${role} "${ws.label}" joined from ${ws.ip} (${room.sources.size} sources)`);
 }
 
-/** Relay SDP/ICE to the other party in the room. */
+/** Source labels are rendered on the panel; keep them short and plain. */
+function sanitizeLabel(raw) {
+  if (typeof raw !== 'string') return '';
+  // Strip control characters, collapse whitespace, cap the length.
+  return raw.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 32);
+}
+
+/**
+ * Relay SDP/ICE. Sources always talk to the host. The host addresses a source
+ * with `to: peerId`; without it the newest source is assumed, which keeps a
+ * pre-whiteboard receiver working unchanged.
+ */
 function onRelay(ws, msg) {
   const room = ws.room && rooms.get(ws.room);
   if (!room) return send(ws, { type: 'error', code: 'not_in_room' });
 
-  const target = ws.role === 'host' ? room.sender : room.host;
+  let target;
+  if (ws.role === 'host') {
+    target = typeof msg.to === 'string' ? room.sources.get(msg.to) : room.lastSource;
+  } else {
+    target = room.host;
+  }
   if (!target || target.readyState !== 1) {
     return send(ws, { type: 'error', code: 'no_peer' });
   }
-  send(target, { ...msg, from: ws.id });
+  // Never forward the routing field itself; `from` is what the receiver keys on.
+  const { to, ...rest } = msg;
+  send(target, { ...rest, from: ws.id });
 }
 
-/** Sender hangs up, or TV drops the current sender. */
-function onBye(ws) {
+/**
+ * Source hangs up, or the host ends sessions. A host `bye` with `to` ends one
+ * source; without `to` it ends every source (the old "Back to stop" action).
+ */
+function onBye(ws, msg = {}) {
   const room = ws.room && rooms.get(ws.room);
   if (!room) return;
 
   if (ws.role === 'host') {
-    if (room.sender) {
-      send(room.sender, { type: 'error', code: 'host_ended' });
-      room.sender.close(4000, 'host ended');
-      room.sender = null;
-    }
-  } else if (room.sender === ws) {
-    room.sender = null;
-    send(room.host, { type: 'peer-leave', peerId: ws.id });
+    const targets = typeof msg.to === 'string'
+      ? [room.sources.get(msg.to)].filter(Boolean)
+      : room.liveSources();
+    for (const src of targets) dropSource(room, src, 'host_ended', 4000, 'host ended');
+  } else {
+    detachSource(room, ws, 'left');
   }
+}
+
+/** Host removes one source window; identical to a targeted bye. */
+function onKick(ws, msg) {
+  if (ws.role !== 'host') return send(ws, { type: 'error', code: 'not_host' });
+  onBye(ws, { to: msg.peerId });
+}
+
+/** Tell a source it is finished and close it; the host is told it left. */
+function dropSource(room, src, code, closeCode, reason) {
+  if (!src) return;
+  send(src, { type: 'error', code });
+  try { src.close(closeCode, reason); } catch (_) { /* closing */ }
+  detachSource(room, src, 'dropped');
+}
+
+/** Remove a source from the room and notify the host once. */
+function detachSource(room, src, why) {
+  if (!room.sources.delete(src.id)) return;
+  if (room.lastSource === src) {
+    const live = room.liveSources();
+    room.lastSource = live.length ? live[live.length - 1] : null;
+  }
+  send(room.host, { type: 'peer-leave', peerId: src.id });
+  log(`room ${room.code}: ${src.role} "${src.label}" ${why} (${room.sources.size} sources)`);
 }
 
 function handleClose(ws) {
@@ -409,17 +489,15 @@ function handleClose(ws) {
   if (!room) return;
 
   if (ws.role === 'host') {
-    // TV went away: tear the room down so the code can't be reused.
-    if (room.sender && room.sender.readyState === 1) {
-      send(room.sender, { type: 'error', code: 'host_gone' });
-      room.sender.close(4001, 'host gone');
+    // Panel went away: tear the room down so the code can't be reused.
+    for (const src of room.liveSources()) {
+      send(src, { type: 'error', code: 'host_gone' });
+      try { src.close(4001, 'host gone'); } catch (_) { /* closing */ }
     }
     rooms.delete(room.code);
     log(`room ${room.code} closed`);
-  } else if (room.sender === ws) {
-    room.sender = null;
-    send(room.host, { type: 'peer-leave', peerId: ws.id });
-    log(`room ${room.code}: sender left`);
+  } else {
+    detachSource(room, ws, 'disconnected');
   }
 }
 
@@ -433,7 +511,7 @@ setInterval(() => {
 
   const now = Date.now();
   for (const [code, room] of rooms) {
-    if (now - room.createdAt > ROOM_TTL_MS && (!room.sender || room.sender.readyState !== 1)) {
+    if (now - room.createdAt > ROOM_TTL_MS && room.liveSources().length === 0) {
       if (room.host && room.host.readyState === 1) room.host.close(4002, 'room expired');
       rooms.delete(code);
       log(`room ${code} expired`);

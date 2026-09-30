@@ -48,6 +48,9 @@
     <string name="settings_url_label">Signaling server (wss:// or ws://)</string>
     <string name="settings_diag_label">Show diagnostics on the lobby screen</string>
     <string name="settings_default">Default: %1$s</string>
+    <string name="settings_classic_label">Classic mode (single fullscreen source)</string>
+    <string name="settings_classic_hint">For older, slower panels. Off = whiteboard with floating source windows.</string>
+    <string name="settings_addsheet_label">Show the pairing code when the app starts</string>
     <string name="settings_overscan_label">Screen edge adjustment (overscan)</string>
     <string name="settings_overscan_hint">If the edges of the picture are cut off by your TV, increase this until the dashed box below is fully visible.</string>
     <string name="settings_overscan_guide">The whole dashed border should be visible</string>
@@ -58,6 +61,7 @@
     <string name="settings_reset">Reset to default</string>
     <string name="settings_back">Back</string>
     <string name="settings_saved">Saved</string>
+    <string name="settings_mode_changed">Mode changes the next time PanelCast starts</string>
     <string name="settings_reset_done">Reset to default server</string>
     <string name="err_gl_oom">Graphics memory exhausted — try a lower quality setting on the sender</string>
 </resources>

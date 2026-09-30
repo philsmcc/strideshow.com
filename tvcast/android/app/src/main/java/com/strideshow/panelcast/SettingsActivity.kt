@@ -49,6 +49,15 @@ class SettingsActivity : AppCompatActivity() {
         binding.switchDiag.setOnCheckedChangeListener { _, checked ->
             prefs.showDiagnostics = checked
         }
+        binding.switchClassic.isChecked = prefs.classicMode
+        binding.switchClassic.setOnCheckedChangeListener { _, checked ->
+            prefs.classicMode = checked
+            // Takes effect on the next launch; say so rather than restarting
+            // under the user's finger.
+            Toast.makeText(this, R.string.settings_mode_changed, Toast.LENGTH_LONG).show()
+        }
+        binding.switchAddSheet.isChecked = prefs.showAddSheetOnLaunch
+        binding.switchAddSheet.setOnCheckedChangeListener { _, checked -> prefs.showAddSheetOnLaunch = checked }
     }
 
     /** Show the current value and inset the guide box to match it live. */

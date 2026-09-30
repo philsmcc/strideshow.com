@@ -34,11 +34,14 @@ export class Sender {
    * @param {object} opts
    * @param {string} opts.room       6-char pairing code
    * @param {'camera'|'screen'} opts.role
+   * @param {string} [opts.label]    name shown on this source's window on the board
    * @param {(state:string, detail?:string)=>void} opts.onState
    */
   constructor(opts) {
     this.room = opts.room;
     this.role = opts.role;
+    this.label = (opts.label || '').slice(0, 32);
+    this.peerId = null;
     this.onState = opts.onState || (() => {});
     this.ws = null;
     this.pc = null;
@@ -75,7 +78,7 @@ export class Sender {
 
     this.ws.onopen = () => {
       this.onState('signaling');
-      this._send({ type: 'join', room: this.room, role: this.role });
+      this._send({ type: 'join', room: this.room, role: this.role, label: this.label });
     };
 
     this.ws.onmessage = async (ev) => {
@@ -95,6 +98,7 @@ export class Sender {
   async _onMessage(msg) {
     switch (msg.type) {
       case 'joined':
+        this.peerId = msg.peerId || null;
         if (Array.isArray(msg.iceServers) && msg.iceServers.length) {
           this.iceServers = msg.iceServers;
         }
@@ -286,9 +290,10 @@ export class Sender {
 export function errorText(code) {
   switch (code) {
     case 'no_room':   return 'That code is not on screen any more. Check the display and try again.';
-    case 'busy':      return 'Someone else is already sharing to this display.';
+    // With the whiteboard a room holds many sources; 'busy' now means the cap.
+    case 'busy':      return 'The display already has the maximum number of sources. Close one on the board and try again.';
     case 'host_gone': return 'The display disconnected.';
-    case 'host_ended':return 'The display ended the session.';
+    case 'host_ended':return 'Your window was closed on the display.';
     case 'rate_limited': return 'Too many attempts. Wait a few minutes and retry.';
     default:          return 'Something went wrong. Please try again.';
   }
